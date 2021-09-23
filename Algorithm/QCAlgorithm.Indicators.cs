@@ -2547,7 +2547,7 @@ namespace QuantConnect.Algorithm
             foreach(var indicator in indicators)
             {
                 if (indicator is not IndicatorBase)
-                    throw new Exception($"ERROR! Ist kein Indikator!");
+                    throw new ArgumentException($"Invalid type {indicator.GetType()}. Expected Indicator.");
 
                 if (indicator is IndicatorBase<IndicatorDataPoint>)
                 {
