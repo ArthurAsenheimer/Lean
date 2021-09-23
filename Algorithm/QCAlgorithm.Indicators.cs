@@ -2560,7 +2560,7 @@ namespace QuantConnect.Algorithm
                 history.PushThrough(slice => handler(slice));
                 if (!indicator.IsReady)
                 {
-                    Debug($"Warning! Indicator {indicator.Name} for Symbol {symbol.ID.ToString()} not ready after IndicatorBatchUpdate." + 
+                    Debug($"Warning! Indicator {indicator.Name} for Symbol {symbol.ID.ToString()} not ready after IndicatorBatchUpdate. " + 
                           $"Please choose a sufficient period and make sure there is enough historical data for {symbol.ID.ToString()}.");
                 }
             }
