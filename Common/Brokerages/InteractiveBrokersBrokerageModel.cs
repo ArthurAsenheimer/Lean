@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using QuantConnect.Util;
 using QuantConnect.Benchmarks;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
@@ -23,7 +24,6 @@ using QuantConnect.Orders.TimeInForces;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Forex;
 using QuantConnect.Securities.Option;
-using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages
 {
@@ -32,6 +32,18 @@ namespace QuantConnect.Brokerages
     /// </summary>
     public class InteractiveBrokersBrokerageModel : DefaultBrokerageModel
     {
+        /// <summary>
+        /// Defines the default set of <see cref="SecurityType"/> values that support <see cref="OrderType.MarketOnOpen"/> orders.
+        /// </summary>
+        private static readonly IReadOnlySet<SecurityType> _defaultMarketOnOpenSupportedSecurityTypes = new HashSet<SecurityType>
+        {
+            SecurityType.Cfd,
+            SecurityType.Equity,
+            SecurityType.Option,
+            SecurityType.FutureOption,
+            SecurityType.IndexOption
+        };
+
         /// <summary>
         /// The default markets for the IB brokerage
         /// </summary>
@@ -45,17 +57,23 @@ namespace QuantConnect.Brokerages
             {SecurityType.Future, Market.CME},
             {SecurityType.FutureOption, Market.CME},
             {SecurityType.Forex, Market.Oanda},
-            {SecurityType.Cfd, Market.Oanda}
+            {SecurityType.Cfd, Market.InteractiveBrokers}
         }.ToReadOnlyDictionary();
 
-        private readonly Type[] _supportedTimeInForces =
+        /// <summary>
+        /// Supported time in force
+        /// </summary>
+        protected virtual Type[] SupportedTimeInForces { get; } =
         {
             typeof(GoodTilCanceledTimeInForce),
             typeof(DayTimeInForce),
             typeof(GoodTilDateTimeInForce)
         };
 
-        private readonly HashSet<OrderType> _supportedOrderTypes = new HashSet<OrderType>
+        /// <summary>
+        /// Supported order types
+        /// </summary>
+        protected virtual HashSet<OrderType> SupportedOrderTypes { get; } = new HashSet<OrderType>
         {
             OrderType.Market,
             OrderType.MarketOnOpen,
@@ -108,6 +126,21 @@ namespace QuantConnect.Brokerages
         }
 
         /// <summary>
+        /// Gets the brokerage's leverage for the specified security
+        /// </summary>
+        /// <param name="security">The security's whose leverage we seek</param>
+        /// <returns>The leverage for the specified security</returns>
+        public override decimal GetLeverage(Security security)
+        {
+            if (AccountType == AccountType.Cash)
+            {
+                return 1m;
+            }
+
+            return security.Type == SecurityType.Cfd ? 10m : base.GetLeverage(security);
+        }
+
+        /// <summary>
         /// Returns true if the brokerage could accept this order. This takes into account
         /// order type, security type, and order size limits.
         /// </summary>
@@ -123,11 +156,28 @@ namespace QuantConnect.Brokerages
             message = null;
 
             // validate order type
-            if (!_supportedOrderTypes.Contains(order.Type))
+            if (!SupportedOrderTypes.Contains(order.Type))
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    Messages.DefaultBrokerageModel.UnsupportedOrderType(this, order, _supportedOrderTypes));
+                    Messages.DefaultBrokerageModel.UnsupportedOrderType(this, order, SupportedOrderTypes));
 
+                return false;
+            }
+            else if (order.Type == OrderType.MarketOnClose && security.Type != SecurityType.Future && security.Type != SecurityType.Equity && security.Type != SecurityType.Cfd)
+            {
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, $"Unsupported order type for {security.Type} security type",
+                    "InteractiveBrokers does not support Market-on-Close orders for other security types different than Future and Equity.");
+                return false;
+            }
+            else if (!BrokerageExtensions.ValidateMarketOnOpenOrder(security, order, GetMarketOnOpenAllowedWindow, _defaultMarketOnOpenSupportedSecurityTypes, out message))
+            {
+                return false;
+            }
+
+            if (order.Type == OrderType.ComboLegLimit && order.GroupOrderManager?.Count >= 4)
+            {
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                    Messages.InteractiveBrokersBrokerageModel.UnsupportedFourLegComboLegLimitOrders(this));
                 return false;
             }
 
@@ -138,7 +188,8 @@ namespace QuantConnect.Brokerages
                 security.Type != SecurityType.Future &&
                 security.Type != SecurityType.FutureOption &&
                 security.Type != SecurityType.Index &&
-                security.Type != SecurityType.IndexOption)
+                security.Type != SecurityType.IndexOption &&
+                security.Type != SecurityType.Cfd)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
                     Messages.DefaultBrokerageModel.UnsupportedSecurityType(this, security));
@@ -155,7 +206,7 @@ namespace QuantConnect.Brokerages
             }
 
             // validate time in force
-            if (!_supportedTimeInForces.Contains(order.TimeInForce.GetType()))
+            if (!SupportedTimeInForces.Contains(order.TimeInForce.GetType()))
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
                     Messages.DefaultBrokerageModel.UnsupportedTimeInForce(this, order));
@@ -289,5 +340,18 @@ namespace QuantConnect.Brokerages
                 {"SGD", Tuple.Create(35000m, 8000000m)},
                 {"ZAR", Tuple.Create(350000m, 100000000m)}
             };
+
+        /// <summary>
+        /// Returns the allowed Market-on-Open submission window for a <see cref="MarketHoursSegment"/>.
+        /// </summary>
+        /// <param name="marketHours">The market hours segment for the security.</param>
+        /// <returns>
+        /// A tuple with <c>MarketOnOpenWindowStart</c> and <c>MarketOnOpenWindowEnd</c>, 
+        /// adjusted to avoid IB order rejections at exact market boundaries.
+        /// </returns>
+        private (TimeOnly MarketOnOpenWindowStart, TimeOnly MarketOnOpenWindowEnd) GetMarketOnOpenAllowedWindow(MarketHoursSegment marketHours)
+        {
+            return (TimeOnly.FromTimeSpan(marketHours.End), TimeOnly.FromTimeSpan(marketHours.Start.Add(-TimeSpan.FromMinutes(2))));
+        }
     }
 }

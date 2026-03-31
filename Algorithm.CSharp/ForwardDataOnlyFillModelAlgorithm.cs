@@ -45,13 +45,13 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if(Time.TimeOfDay != new TimeSpan(9, 30, 0))
                 {
-                    throw new Exception($"Unexpected event time {Time}");
+                    throw new RegressionTestException($"Unexpected event time {Time}");
                 }
 
                 var ticket = Buy("SPY", 1);
                 if(ticket.Status != OrderStatus.Submitted)
                 {
-                    throw new Exception($"Unexpected order status {ticket.Status}");
+                    throw new RegressionTestException($"Unexpected order status {ticket.Status}");
                 }
             }
         }
@@ -61,7 +61,7 @@ namespace QuantConnect.Algorithm.CSharp
             Debug($"OnOrderEvent:: {orderEvent}");
             if (orderEvent.Status == OrderStatus.Filled && (Time.Hour != 10 || Time.Minute != 0))
             {
-                throw new Exception($"Unexpected fill time {Time}");
+                throw new RegressionTestException($"Unexpected fill time {Time}");
             }
         }
 
@@ -89,7 +89,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -102,34 +102,43 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "1"},
+            {"Total Orders", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0.071%"},
             {"Drawdown", "0.000%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100005.93"},
             {"Net Profit", "0.006%"},
-            {"Sharpe Ratio", "3.363"},
+            {"Sharpe Ratio", "-47.299"},
+            {"Sortino Ratio", "-100.304"},
             {"Probabilistic Sharpe Ratio", "81.116%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0"},
+            {"Alpha", "-0.007"},
             {"Beta", "0.001"},
             {"Annual Standard Deviation", "0"},
             {"Annual Variance", "0"},
             {"Information Ratio", "-3.425"},
             {"Tracking Error", "0.107"},
-            {"Treynor Ratio", "0.382"},
+            {"Treynor Ratio", "-5.375"},
             {"Total Fees", "$1.00"},
             {"Estimated Strategy Capacity", "$62000000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
             {"Portfolio Turnover", "0.00%"},
-            {"OrderListHash", "9eac57692ae167cf5be63ad931b8a376"}
+            {"Drawdown Recovery", "3"},
+            {"OrderListHash", "86f6dc102fded318c6264e36a56567b7"}
         };
     }
 }

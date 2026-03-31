@@ -39,7 +39,7 @@ namespace QuantConnect.Orders.Fills
         /// When Python calls a C# method that calls a method that's overriden in python it won't
         /// run the python implementation unless the call is performed through python too.
         /// </summary>
-        protected FillModelPythonWrapper PythonWrapper;
+        protected FillModelPythonWrapper PythonWrapper { get; set; }
 
         /// <summary>
         /// Used to set the <see cref="FillModelPythonWrapper"/> instance if any
@@ -104,13 +104,19 @@ namespace QuantConnect.Orders.Fills
                         : MarketOnCloseFill(parameters.Security, parameters.Order as MarketOnCloseOrder));
                     break;
                 case OrderType.ComboMarket:
-                    orderEvents = ComboMarketFill(parameters.Order, parameters);
+                    orderEvents = PythonWrapper != null
+                        ? PythonWrapper.ComboMarketFill(parameters.Order, parameters)
+                        : ComboMarketFill(parameters.Order, parameters);
                     break;
                 case OrderType.ComboLimit:
-                    orderEvents = ComboLimitFill(parameters.Order, parameters);
+                    orderEvents = PythonWrapper != null
+                        ? PythonWrapper.ComboLimitFill(parameters.Order, parameters)
+                        : ComboLimitFill(parameters.Order, parameters);
                     break;
                 case OrderType.ComboLegLimit:
-                    orderEvents = ComboLegLimitFill(parameters.Order, parameters);
+                    orderEvents = PythonWrapper != null
+                        ? PythonWrapper.ComboLegLimitFill(parameters.Order, parameters)
+                        : ComboLegLimitFill(parameters.Order, parameters);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -491,7 +497,11 @@ namespace QuantConnect.Orders.Fills
                     //-> 1.2 Buy Stop: If Price Above Setpoint, Buy:
                     if (prices.High > order.StopPrice || order.StopTriggered)
                     {
-                        order.StopTriggered = true;
+                        if (!order.StopTriggered)
+                        {
+                            order.StopTriggered = true;
+                            Parameters.OnOrderUpdated(order);
+                        }
 
                         // Fill the limit order, using closing price of bar:
                         // Note > Can't use minimum price, because no way to be sure minimum wasn't before the stop triggered.
@@ -509,7 +519,11 @@ namespace QuantConnect.Orders.Fills
                     //-> 1.1 Sell Stop: If Price below setpoint, Sell:
                     if (prices.Low < order.StopPrice || order.StopTriggered)
                     {
-                        order.StopTriggered = true;
+                        if (!order.StopTriggered)
+                        {
+                            order.StopTriggered = true;
+                            Parameters.OnOrderUpdated(order);
+                        }
 
                         // Fill the limit order, using minimum price of the bar
                         // Note > Can't use minimum price, because no way to be sure minimum wasn't before the stop triggered.
@@ -788,8 +802,8 @@ namespace QuantConnect.Orders.Fills
             {
                 return fill;
             }
-            // make sure the exchange is open/normal market hours before filling
-            if (!IsExchangeOpen(asset, false)) return fill;
+
+            // LocalTime has reached or passed market close, proceed to fill
 
             fill.FillPrice = GetPricesCheckingPythonWrapper(asset, order.Direction).Close;
             fill.Status = OrderStatus.Filled;
@@ -1080,8 +1094,8 @@ namespace QuantConnect.Orders.Fills
                     return false;
                 }
 
-                var resolution = (currentBar.EndTime - currentBar.Time).ToHigherResolutionEquivalent(false);
-                var isOnCurrentBar = resolution == Resolution.Daily
+                var barSpan = currentBar.EndTime - currentBar.Time;
+                var isOnCurrentBar = barSpan > Time.OneHour
                     // for fill purposes we consider the market open for daily bars if we are in the same day
                     ? asset.LocalTime.Date == currentBar.EndTime.Date
                     // for other resolution bars, market is considered open if we are within the bar time

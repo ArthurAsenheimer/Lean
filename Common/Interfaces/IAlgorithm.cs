@@ -22,6 +22,8 @@ using QuantConnect.Benchmarks;
 using QuantConnect.Brokerages;
 using QuantConnect.Scheduling;
 using QuantConnect.Securities;
+using QuantConnect.Statistics;
+using QuantConnect.Data.Market;
 using QuantConnect.Notifications;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -30,7 +32,8 @@ using QuantConnect.Securities.Option;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Alphas.Analysis;
-using QuantConnect.Statistics;
+using QuantConnect.Commands;
+using Common.Util;
 
 namespace QuantConnect.Interfaces
 {
@@ -133,6 +136,14 @@ namespace QuantConnect.Interfaces
         }
 
         /// <summary>
+        /// Gets the risk free interest rate model used to get the interest rates
+        /// </summary>
+        IRiskFreeInterestRateModel RiskFreeInterestRateModel
+        {
+            get;
+        }
+
+        /// <summary>
         /// Gets the brokerage message handler used to decide what to do
         /// with each message sent from the brokerage
         /// </summary>
@@ -187,12 +198,30 @@ namespace QuantConnect.Interfaces
         /// <summary>
         /// Public name for the algorithm.
         /// </summary>
-        /// <remarks>Not currently used but preserved for API integrity</remarks>
         string Name
         {
             get;
             set;
         }
+
+        /// <summary>
+        /// A list of tags associated with the algorithm or the backtest, useful for categorization
+        /// </summary>
+        HashSet<string> Tags
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Event fired algorithm's name is changed
+        /// </summary>
+        event AlgorithmEvent<string> NameUpdated;
+
+        /// <summary>
+        /// Event fired when the tag collection is updated
+        /// </summary>
+        event AlgorithmEvent<HashSet<string>> TagsUpdated;
 
         /// <summary>
         /// Current date/time in the algorithm's local time zone
@@ -401,7 +430,7 @@ namespace QuantConnect.Interfaces
         /// <summary>
         /// Gets a read-only dictionary with all current parameters
         /// </summary>
-        IReadOnlyDictionary<string, string> GetParameters();
+        ReadOnlyExtendedDictionary<string, string> GetParameters();
 
         /// <summary>
         /// Gets the parameter with the specified name. If a parameter with the specified name does not exist,
@@ -446,12 +475,24 @@ namespace QuantConnect.Interfaces
         void SetParameters(Dictionary<string, string> parameters);
 
         /// <summary>
-        /// Checks if the provided asset is shortable at the brokerage
+        /// Determines if the Symbol is shortable at the brokerage
         /// </summary>
-        /// <param name="symbol">Symbol to check if it is shortable</param>
-        /// <param name="quantity">Order quantity to check if shortable</param>
-        /// <returns></returns>
-        bool Shortable(Symbol symbol, decimal quantity);
+        /// <param name="symbol">Symbol to check if shortable</param>
+        /// <param name="shortQuantity">Order's quantity to check if it is currently shortable, taking into account current holdings and open orders</param>
+        /// <param name="updateOrderId">Optionally the id of the order being updated. When updating an order
+        /// we want to ignore it's submitted short quantity and use the new provided quantity to determine if we
+        /// can perform the update</param>
+        /// <returns>True if the symbol can be shorted by the requested quantity</returns>
+        bool Shortable(Symbol symbol, decimal shortQuantity, int? updateOrderId = null);
+
+        /// <summary>
+        /// Gets the quantity shortable for the given asset
+        /// </summary>
+        /// <returns>
+        /// Quantity shortable for the given asset. Zero if not
+        /// shortable, or a number greater than zero if shortable.
+        /// </returns>
+        long ShortableQuantity(Symbol symbol);
 
         /// <summary>
         /// Sets the brokerage model used to resolve transaction models, settlement models,
@@ -472,6 +513,30 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="slice">The current data slice</param>
         void OnFrameworkData(Slice slice);
+
+        /// <summary>
+        /// Event handler to be called when there's been a split event
+        /// </summary>
+        /// <param name="splits">The current time slice splits</param>
+        void OnSplits(Splits splits);
+
+        /// <summary>
+        /// Event handler to be called when there's been a dividend event
+        /// </summary>
+        /// <param name="dividends">The current time slice dividends</param>
+        void OnDividends(Dividends dividends);
+
+        /// <summary>
+        /// Event handler to be called when there's been a delistings event
+        /// </summary>
+        /// <param name="delistings">The current time slice delistings</param>
+        void OnDelistings(Delistings delistings);
+
+        /// <summary>
+        /// Event handler to be called when there's been a symbol changed event
+        /// </summary>
+        /// <param name="symbolsChanged">The current time slice symbol changed events</param>
+        void OnSymbolChangedEvents(SymbolChangedEvents symbolsChanged);
 
         /// <summary>
         /// Event fired each time that we add/remove securities from the data feed
@@ -526,11 +591,13 @@ namespace QuantConnect.Interfaces
         /// <remarks>Deprecated because different assets have different market close times,
         /// and because Python does not support two methods with the same name</remarks>
         [Obsolete("This method is deprecated. Please use this overload: OnEndOfDay(Symbol symbol)")]
+        [StubsIgnore]
         void OnEndOfDay();
 
         /// <summary>
         /// Call this method at the end of each day of data.
         /// </summary>
+        [StubsAvoidImplicits]
         void OnEndOfDay(Symbol symbol);
 
         /// <summary>
@@ -544,6 +611,13 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="newEvent">Event information</param>
         void OnOrderEvent(OrderEvent newEvent);
+
+        /// <summary>
+        /// Generic untyped command call handler
+        /// </summary>
+        /// <param name="data">The associated data</param>
+        /// <returns>True if success, false otherwise. Returning null will disable command feedback</returns>
+        bool? OnCommand(dynamic data);
 
         /// <summary>
         /// Will submit an order request to the algorithm
@@ -622,7 +696,7 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="clearChartData"></param>
         /// <returns>List of Chart Updates</returns>
-        List<Chart> GetChartUpdates(bool clearChartData = false);
+        IEnumerable<Chart> GetChartUpdates(bool clearChartData = false);
 
         /// <summary>
         /// Set a required SecurityType-symbol and resolution for algorithm
@@ -636,7 +710,7 @@ namespace QuantConnect.Interfaces
         /// <param name="extendedMarketHours">ExtendedMarketHours send in data from 4am - 8pm, not used for FOREX</param>
         /// <param name="dataMappingMode">The contract mapping mode to use for the security</param>
         /// <param name="dataNormalizationMode">The price scaling mode to use for the security</param>
-        Security AddSecurity(SecurityType securityType, string symbol, Resolution? resolution, string market, bool fillForward, decimal leverage, bool extendedMarketHours,
+        Security AddSecurity(SecurityType securityType, string symbol, Resolution? resolution, string market, bool? fillForward, decimal leverage, bool? extendedMarketHours,
             DataMappingMode? dataMappingMode = null, DataNormalizationMode? dataNormalizationMode = null);
 
         /// <summary>
@@ -652,7 +726,7 @@ namespace QuantConnect.Interfaces
         /// <param name="contractDepthOffset">The continuous contract desired offset from the current front month.
         /// For example, 0 (default) will use the front month, 1 will use the back month contract</param>
         /// <returns>The new Security that was added to the algorithm</returns>
-        Security AddSecurity(Symbol symbol, Resolution? resolution = null, bool fillForward = true, decimal leverage = Security.NullLeverage, bool extendedMarketHours = false,
+        Security AddSecurity(Symbol symbol, Resolution? resolution = null, bool? fillForward = null, decimal leverage = Security.NullLeverage, bool? extendedMarketHours = null,
             DataMappingMode? dataMappingMode = null, DataNormalizationMode? dataNormalizationMode = null, int contractDepthOffset = 0);
 
         /// <summary>
@@ -682,7 +756,8 @@ namespace QuantConnect.Interfaces
         /// open orders and then liquidate any existing holdings
         /// </summary>
         /// <param name="symbol">The symbol of the security to be removed</param>
-        bool RemoveSecurity(Symbol symbol);
+        /// <param name="tag">Optional tag to indicate the cause of removal</param>
+        bool RemoveSecurity(Symbol symbol, string tag = null);
 
         /// <summary>
         /// Sets the account currency cash symbol this algorithm is to manage, as well as
@@ -709,12 +784,13 @@ namespace QuantConnect.Interfaces
         void SetCash(string symbol, decimal startingCash, decimal conversionRate = 0);
 
         /// <summary>
-        /// Liquidate your portfolio holdings:
+        /// Liquidate your portfolio holdings
         /// </summary>
-        /// <param name="symbolToLiquidate">Specific asset to liquidate, defaults to all.</param>
-        /// <param name="tag">Custom tag to know who is calling this.</param>
-        /// <returns>list of order ids</returns>
-        List<int> Liquidate(Symbol symbolToLiquidate = null, string tag = "Liquidated");
+        /// <param name="symbol">Specific asset to liquidate, defaults to all.</param>
+        /// <param name="asynchronous">Flag to indicate if the symbols should be liquidated asynchronously</param>
+        /// <param name="tag">Custom tag to know who is calling this</param>
+        /// <param name="orderProperties">Order properties to use</param>
+        List<OrderTicket> Liquidate(Symbol symbol = null, bool asynchronous = false, string tag = "Liquidated", IOrderProperties orderProperties = null);
 
         /// <summary>
         /// Set live mode state of the algorithm run: Public setter for the algorithm property LiveMode.
@@ -764,9 +840,23 @@ namespace QuantConnect.Interfaces
         /// Get the last known price using the history provider.
         /// Useful for seeding securities with the correct price
         /// </summary>
-        /// <param name="security"><see cref="Security"/> object for which to retrieve historical data</param>
+        /// <param name="symbol">The symbol for which to retrieve historical data</param>
         /// <returns>A single <see cref="BaseData"/> object with the last known price</returns>
-        BaseData GetLastKnownPrice(Security security);
+        BaseData GetLastKnownPrice(Symbol symbol);
+
+        /// <summary>
+        /// Yields data to warmup a security for all it's subscribed data types
+        /// </summary>
+        /// <param name="symbol">The symbol for which to retrieve historical data</param>
+        /// <returns>Securities historical data</returns>
+        IEnumerable<BaseData> GetLastKnownPrices(Symbol symbol);
+
+        /// <summary>
+        /// Yields data to warm up multiple securities for all their subscribed data types
+        /// </summary>
+        /// <param name="symbols">The symbols we want to get seed data for</param>
+        /// <returns>Securities historical data</returns>
+        DataDictionary<IEnumerable<BaseData>> GetLastKnownPrices(IEnumerable<Symbol> symbols);
 
         /// <summary>
         /// Set the runtime error
@@ -837,5 +927,35 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="statisticsService">The statistics service instance</param>
         void SetStatisticsService(IStatisticsService statisticsService);
+
+        /// <summary>
+        /// Sets name to the currently running backtest
+        /// </summary>
+        /// <param name="name">The name for the backtest</param>
+        void SetName(string name);
+
+        /// <summary>
+        /// Adds a tag to the algorithm
+        /// </summary>
+        /// <param name="tag">The tag to add</param>
+        void AddTag(string tag);
+
+        /// <summary>
+        /// Sets the tags for the algorithm
+        /// </summary>
+        /// <param name="tags">The tags</param>
+        void SetTags(HashSet<string> tags);
+
+        /// <summary>
+        /// Run a callback command instance
+        /// </summary>
+        /// <param name="command">The callback command instance</param>
+        /// <returns>The command result</returns>
+        CommandResultPacket RunCommand(CallbackCommand command);
+
+        /// <summary>
+        /// Gets the default order properties
+        /// </summary>
+        IOrderProperties DefaultOrderProperties { get; }
     }
 }

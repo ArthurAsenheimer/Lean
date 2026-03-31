@@ -19,6 +19,7 @@ using System.ComponentModel.Composition;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
+using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.RealTime;
@@ -35,6 +36,8 @@ namespace QuantConnect.Lean.Engine
     /// </summary>
     public class LeanEngineAlgorithmHandlers : IDisposable
     {
+        private bool _dataMonitorWired;
+
         /// <summary>
         /// Gets the result handler used to communicate results from the algorithm
         /// </summary>
@@ -110,6 +113,7 @@ namespace QuantConnect.Lean.Engine
         /// <param name="dataPermissionsManager">The data permission manager to use</param>
         /// <param name="liveMode">True for live mode, false otherwise</param>
         /// <param name="researchMode">True for research mode, false otherwise. This has less priority than liveMode</param>
+        /// <param name="dataMonitor">Optionally the data monitor instance to use</param>
         public LeanEngineAlgorithmHandlers(IResultHandler results,
             ISetupHandler setup,
             IDataFeed dataFeed,
@@ -121,7 +125,8 @@ namespace QuantConnect.Lean.Engine
             IObjectStore objectStore,
             IDataPermissionManager dataPermissionsManager,
             bool liveMode,
-            bool researchMode = false
+            bool researchMode = false,
+            IDataMonitor dataMonitor = null
             )
         {
             if (results == null)
@@ -176,10 +181,11 @@ namespace QuantConnect.Lean.Engine
             ObjectStore = objectStore;
             DataPermissionsManager = dataPermissionsManager;
             DataCacheProvider = new ZipDataCacheProvider(DataProvider, isDataEphemeral: liveMode);
-            DataMonitor = new DataMonitor();
+            DataMonitor = dataMonitor ?? new DataMonitor();
 
             if (!liveMode && !researchMode)
             {
+                _dataMonitorWired = true;
                 DataProvider.NewDataRequest += DataMonitor.OnNewDataRequest;
             }
         }
@@ -203,6 +209,7 @@ namespace QuantConnect.Lean.Engine
             var dataProviderTypeName = Config.Get("data-provider", "DefaultDataProvider");
             var objectStoreTypeName = Config.Get("object-store", "LocalObjectStore");
             var dataPermissionManager = Config.Get("data-permission-manager", "DataPermissionManager");
+            var dataMonitor = Config.Get("data-monitor", "QuantConnect.Data.DataMonitor");
 
             var result = new LeanEngineAlgorithmHandlers(
                 composer.GetExportedValueByTypeName<IResultHandler>(resultHandlerTypeName),
@@ -215,8 +222,9 @@ namespace QuantConnect.Lean.Engine
                 composer.GetExportedValueByTypeName<IDataProvider>(dataProviderTypeName),
                 composer.GetExportedValueByTypeName<IObjectStore>(objectStoreTypeName),
                 composer.GetExportedValueByTypeName<IDataPermissionManager>(dataPermissionManager),
-                Config.GetBool("live-mode"),
-                researchMode
+                Globals.LiveMode,
+                researchMode,
+                composer.GetExportedValueByTypeName<IDataMonitor>(dataMonitor)
                 );
 
             result.FactorFileProvider.Initialize(result.MapFileProvider, result.DataProvider);
@@ -228,6 +236,8 @@ namespace QuantConnect.Lean.Engine
                 throw new ArgumentException($"The {typeof(ApiDataProvider)} can only be used with {typeof(LocalZipFactorFileProvider)}" +
                     $" and {typeof(LocalZipMapFileProvider)}, please update 'config.json'");
             }
+
+            FundamentalService.Initialize(result.DataProvider, Globals.LiveMode);
 
             return result;
         }
@@ -243,6 +253,10 @@ namespace QuantConnect.Lean.Engine
             DataCacheProvider.DisposeSafely();
             Setup.DisposeSafely();
             ObjectStore.DisposeSafely();
+            if (_dataMonitorWired)
+            {
+                DataProvider.NewDataRequest -= DataMonitor.OnNewDataRequest;
+            }
             DataMonitor.DisposeSafely();
 
             Log.Trace("LeanEngineAlgorithmHandlers.Dispose(): Disposed of algorithm handlers.");

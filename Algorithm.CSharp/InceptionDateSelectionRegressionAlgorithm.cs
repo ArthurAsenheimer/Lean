@@ -52,8 +52,8 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.
         /// </summary>
-        /// <param name="data">TradeBars dictionary object keyed by symbol containing the stock data</param>
-        public override void OnData(Slice data)
+        /// <param name="slice">TradeBars dictionary object keyed by symbol containing the stock data</param>
+        public override void OnData(Slice slice)
         {
             if (_changes == SecurityChanges.None) return;
 
@@ -89,12 +89,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 403;
+        public long DataPoints => 405;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -102,34 +102,43 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "9"},
+            {"Total Orders", "9"},
             {"Average Win", "0.11%"},
             {"Average Loss", "-0.24%"},
             {"Compounding Annual Return", "28.358%"},
             {"Drawdown", "1.200%"},
             {"Expectancy", "-0.267"},
+            {"Start Equity", "100000"},
+            {"End Equity", "102119.68"},
             {"Net Profit", "2.120%"},
-            {"Sharpe Ratio", "3.329"},
+            {"Sharpe Ratio", "3.201"},
+            {"Sortino Ratio", "5.22"},
             {"Probabilistic Sharpe Ratio", "76.344%"},
             {"Loss Rate", "50%"},
             {"Win Rate", "50%"},
             {"Profit-Loss Ratio", "0.47"},
-            {"Alpha", "0.019"},
+            {"Alpha", "0.015"},
             {"Beta", "0.478"},
             {"Annual Standard Deviation", "0.058"},
             {"Annual Variance", "0.003"},
             {"Information Ratio", "-2.771"},
             {"Tracking Error", "0.063"},
-            {"Treynor Ratio", "0.408"},
+            {"Treynor Ratio", "0.392"},
             {"Total Fees", "$16.73"},
             {"Estimated Strategy Capacity", "$7000000.00"},
             {"Lowest Capacity Asset", "IBM R735QTJ8XC9X"},
             {"Portfolio Turnover", "14.45%"},
-            {"OrderListHash", "818346776a934bcaabb2752b31f8b092"}
+            {"Drawdown Recovery", "4"},
+            {"OrderListHash", "27cdeff9728c1a42239ea1b5b2c335dc"}
         };
     }
 }

@@ -50,8 +50,9 @@ namespace QuantConnect.Algorithm.CSharp
             // set our strike/expiry filter for this option chain
             // SetFilter method accepts TimeSpan objects or integer for days.
             // The following statements yield the same filtering criteria
-            option.SetFilter(-2, +2, 0, 180);
-            // option.SetFilter(-2, +2, TimeSpan.Zero, TimeSpan.FromDays(180));
+            option.SetFilter(u => u.StandardsOnly()
+                                   .Strikes(-2, +2)
+                                   .Expiration(0, 180));
 
             // Adding this to reproduce GH issue #2314
             SetWarmup(TimeSpan.FromMinutes(1));
@@ -83,7 +84,7 @@ namespace QuantConnect.Algorithm.CSharp
                 Liquidate();
             }
 
-            foreach(var kpv in slice.Bars)
+            foreach (var kpv in slice.Bars)
             {
                 Log($"---> OnData: {Time}, {kpv.Key.Value}, {kpv.Value.Close:0.00}");
             }
@@ -107,12 +108,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 475777;
+        public long DataPoints => 15130;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -120,18 +121,26 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "418"},
+            {"Total Orders", "420"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "952636.6"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -143,11 +152,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$418.00"},
-            {"Estimated Strategy Capacity", "$3000.00"},
-            {"Lowest Capacity Asset", "GOOCV W78ZFMEBBB2E|GOOCV VP83T1ZUHROL"},
-            {"Portfolio Turnover", "338.56%"},
-            {"OrderListHash", "e0289a2989c91934656ff7e578f5e810"}
+            {"Total Fees", "$543.40"},
+            {"Estimated Strategy Capacity", "$4000.00"},
+            {"Lowest Capacity Asset", "GOOCV W78ZFMEBFLDY|GOOCV VP83T1ZUHROL"},
+            {"Portfolio Turnover", "338.60%"},
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "8229716b93428dc885cf856b4cc9fc35"}
         };
     }
 }

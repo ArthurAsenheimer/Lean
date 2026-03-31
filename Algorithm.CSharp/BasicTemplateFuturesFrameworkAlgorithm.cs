@@ -131,12 +131,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public virtual Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public virtual List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public virtual long DataPoints => 57752;
+        public virtual long DataPoints => 24883;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -144,34 +144,43 @@ namespace QuantConnect.Algorithm.CSharp
         public virtual int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "2"},
+            {"Total Orders", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "-81.734%"},
             {"Drawdown", "4.100%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "97830.76"},
             {"Net Profit", "-2.169%"},
-            {"Sharpe Ratio", "-10.195"},
+            {"Sharpe Ratio", "-10.299"},
+            {"Sortino Ratio", "-10.299"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-1.206"},
+            {"Alpha", "-1.212"},
             {"Beta", "0.238"},
             {"Annual Standard Deviation", "0.072"},
             {"Annual Variance", "0.005"},
             {"Information Ratio", "-15.404"},
             {"Tracking Error", "0.176"},
-            {"Treynor Ratio", "-3.077"},
+            {"Treynor Ratio", "-3.109"},
             {"Total Fees", "$4.62"},
             {"Estimated Strategy Capacity", "$17000000.00"},
             {"Lowest Capacity Asset", "GC VL5E74HP3EE5"},
             {"Portfolio Turnover", "43.23%"},
-            {"OrderListHash", "323b899ae80aa839e320806411665ce7"}
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "c0fc1bcdc3008a8d263521bbc9d7cdbd"}
         };
     }
 }

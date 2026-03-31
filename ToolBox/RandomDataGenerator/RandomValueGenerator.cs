@@ -16,7 +16,6 @@
 using QuantConnect.Securities;
 using QuantConnect.Util;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace QuantConnect.ToolBox.RandomDataGenerator
@@ -30,6 +29,7 @@ namespace QuantConnect.ToolBox.RandomDataGenerator
         private readonly Random _random;
         private readonly MarketHoursDatabase _marketHoursDatabase;
         private readonly SymbolPropertiesDatabase _symbolPropertiesDatabase;
+        private const decimal _maximumPriceAllowed = 1000000m;
 
 
         public RandomValueGenerator()
@@ -118,9 +118,9 @@ namespace QuantConnect.ToolBox.RandomDataGenerator
 
         public double NextDouble() => _random.NextDouble();
 
-        public int NextInt(int v1, int v2) => _random.Next(v1, v2);
+        public int NextInt(int minValue, int maxValue) => _random.Next(minValue, maxValue);
 
-        public int NextInt(int v1) => _random.Next(v1);
+        public int NextInt(int maxValue) => _random.Next(maxValue);
 
         /// <summary>
         /// Generates a random <see cref="decimal"/> suitable as a price. This should observe minimum price
@@ -173,9 +173,23 @@ namespace QuantConnect.ToolBox.RandomDataGenerator
                 if (price < 20 * minimumPriceVariation)
                 {
                     // The price should not be to close to the minimum price variation.
-                    // Invalidate the price to try again and increase the probability of the it going up
+                    // Invalidate the price to try again and increase the probability of it to going up
                     price = -1m;
                     increaseProbabilityFactor = Math.Max(increaseProbabilityFactor - 0.05, 0);
+                }
+
+                if (price > (_maximumPriceAllowed / 10m))
+                {
+                    // The price should not be too higher
+                    // Decrease the probability of it to going up
+                    increaseProbabilityFactor = increaseProbabilityFactor + 0.05;
+                }
+
+                if (price > _maximumPriceAllowed)
+                {
+                    // The price should not be too higher
+                    // Invalidate the price to try again
+                    price = -1;
                 }
             } while (!IsPriceValid(securityType, price) && ++attempts < 10);
 
@@ -209,7 +223,7 @@ namespace QuantConnect.ToolBox.RandomDataGenerator
                 }
                 default:
                 {
-                    return price > 0;
+                    return price > 0 && price < _maximumPriceAllowed;
                 }
             }
         }

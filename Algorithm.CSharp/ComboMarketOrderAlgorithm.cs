@@ -14,6 +14,7 @@
 */
 
 using QuantConnect.Orders;
+using System;
 using System.Collections.Generic;
 
 namespace QuantConnect.Algorithm.CSharp
@@ -29,6 +30,15 @@ namespace QuantConnect.Algorithm.CSharp
             return ComboMarketOrder(legs, quantity);
         }
 
+        public override void OnOrderEvent(OrderEvent orderEvent)
+        {
+            base.OnOrderEvent(orderEvent);
+            if (orderEvent.Status == OrderStatus.Filled && orderEvent.OrderFee.Value.Amount != (orderEvent.AbsoluteFillQuantity * 0.65m))
+            {
+                throw new RegressionTestException($"The fee for each order should be {orderEvent.AbsoluteFillQuantity * 0.65m} USD, but for order {orderEvent.OrderId} was {orderEvent.OrderFee}");
+            }
+        }
+
         /// <summary>
         /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
         /// </summary>
@@ -37,12 +47,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public override Language[] Languages { get; } = { Language.CSharp };
+        public override List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 475788;
+        public override long DataPoints => 15023;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -50,18 +60,26 @@ namespace QuantConnect.Algorithm.CSharp
         public override int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public override AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "3"},
+            {"Total Orders", "3"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "200000"},
+            {"End Equity", "198024"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -73,11 +91,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$75.00"},
-            {"Estimated Strategy Capacity", "$70000.00"},
-            {"Lowest Capacity Asset", "GOOCV W78ZERHAOVVQ|GOOCV VP83T1ZUHROL"},
-            {"Portfolio Turnover", "30.36%"},
-            {"OrderListHash", "cf49ecb1e9787688df1d9920a75b83b7"}
+            {"Total Fees", "$26.00"},
+            {"Estimated Strategy Capacity", "$69000.00"},
+            {"Lowest Capacity Asset", "GOOCV W78ZERHAT67A|GOOCV VP83T1ZUHROL"},
+            {"Portfolio Turnover", "30.35%"},
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "0b9f42bc22c9c7c382bc57a64c99f7e5"}
         };
     }
 }

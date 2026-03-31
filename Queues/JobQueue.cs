@@ -17,6 +17,7 @@ using Fasterflect;
 using Newtonsoft.Json;
 using QuantConnect.Brokerages;
 using QuantConnect.Configuration;
+using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
@@ -42,33 +43,57 @@ namespace QuantConnect.Queues
         private const string DefaultHistoryProvider = "SubscriptionDataReaderHistoryProvider";
         private const string DefaultDataQueueHandler = "LiveDataQueue";
         private const string DefaultDataChannelProvider = "DataChannelProvider";
-        private bool _liveMode = Config.GetBool("live-mode");
-        private static readonly string AccessToken = Config.Get("api-access-token");
         private static readonly string Channel = Config.Get("data-channel");
-        private static readonly string OrganizationId = Config.Get("job-organization-id");
-        private static readonly int UserId = Config.GetInt("job-user-id", 0);
-        private static readonly int ProjectId = Config.GetInt("job-project-id", 0);
         private readonly string AlgorithmTypeName = Config.Get("algorithm-type-name");
-        private readonly Language Language = (Language)Enum.Parse(typeof(Language), Config.Get("algorithm-language"), ignoreCase: true);
+        private Language? _language;
 
         /// <summary>
-        /// Physical location of Algorithm DLL.
+        /// This property is protected for testing purposes
         /// </summary>
-        private string AlgorithmLocation
+        protected Language Language
         {
             get
             {
-                // we expect this dll to be copied into the output directory
-                return Config.Get("algorithm-location", "QuantConnect.Algorithm.CSharp.dll");
+                if (_language == null)
+                {
+                    string algorithmLanguage = Config.Get("algorithm-language");
+                    if (string.IsNullOrEmpty(algorithmLanguage))
+                    {
+                        var extension = Path.GetExtension(AlgorithmLocation).ToLower();
+                        switch (extension)
+                        {
+                            case ".dll":
+                                _language = Language.CSharp;
+                                break;
+                            case ".py":
+                                _language = Language.Python;
+                                break;
+                            default:
+                                throw new ArgumentException($"Unknown extension, algorithm extension was {extension}");
+                        }
+                    }
+                    else
+                    {
+                        _language = (Language)Enum.Parse(typeof(Language), algorithmLanguage, ignoreCase: true);
+                    }
+                }
+
+                return (Language)_language;
             }
         }
 
         /// <summary>
+        /// Physical location of Algorithm DLL.
+        /// </summary>
+        /// <remarks>We expect this dll to be copied into the output directory</remarks>
+        private string AlgorithmLocation { get; } = Config.Get("algorithm-location", "QuantConnect.Algorithm.CSharp.dll");
+
+        /// <summary>
         /// Initialize the job queue:
         /// </summary>
-        public void Initialize(IApi api)
+        public void Initialize(IApi api, IMessagingHandler messagingHandler)
         {
-            //
+            api.Initialize(Globals.UserId, Globals.UserToken, Globals.DataFolder);
         }
 
         /// <summary>
@@ -97,17 +122,17 @@ namespace QuantConnect.Queues
         /// Desktop/Local Get Next Task - Get task from the Algorithm folder of VS Solution.
         /// </summary>
         /// <returns></returns>
-        public AlgorithmNodePacket NextJob(out string location)
+        public AlgorithmNodePacket NextJob(out string algorithmPath)
         {
-            location = GetAlgorithmLocation();
+            algorithmPath = GetAlgorithmLocation();
 
-            Log.Trace($"JobQueue.NextJob(): Selected {location}");
+            Log.Trace($"JobQueue.NextJob(): Selected {algorithmPath}");
 
             // check for parameters in the config
             var parameters = new Dictionary<string, string>();
 
             var parametersConfigString = Config.Get("parameters");
-            if (parametersConfigString != string.Empty)
+            if (!string.IsNullOrEmpty(parametersConfigString))
             {
                 parameters = JsonConvert.DeserializeObject<Dictionary<string, string>>(parametersConfigString);
             }
@@ -118,16 +143,17 @@ namespace QuantConnect.Queues
                 SecondLimit = Config.GetInt("symbol-second-limit", 10000),
                 TickLimit = Config.GetInt("symbol-tick-limit", 10000),
                 RamAllocation = int.MaxValue,
-                MaximumDataPointsPerChartSeries = Config.GetInt("maximum-data-points-per-chart-series", 4000),
+                MaximumDataPointsPerChartSeries = Config.GetInt("maximum-data-points-per-chart-series", 1000000),
+                MaximumChartSeries = Config.GetInt("maximum-chart-series", 30),
                 StorageLimit = Config.GetValue("storage-limit", 10737418240L),
                 StorageFileCount = Config.GetInt("storage-file-count", 10000),
-                StoragePermissions = (FileAccess)Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
+                StorageAccess = Config.GetValue("storage-permissions", new Packets.StoragePermissions())
             };
 
             var algorithmId = Config.Get("algorithm-id", AlgorithmTypeName);
 
             //If this isn't a backtesting mode/request, attempt a live job.
-            if (_liveMode)
+            if (Globals.LiveMode)
             {
                 var dataHandlers = Config.Get("data-queue-handler", DefaultDataQueueHandler);
                 var liveJob = new LiveNodePacket
@@ -139,10 +165,10 @@ namespace QuantConnect.Queues
                     DataQueueHandler = dataHandlers,
                     DataChannelProvider = Config.Get("data-channel-provider", DefaultDataChannelProvider),
                     Channel = Channel,
-                    UserToken = AccessToken,
-                    UserId = UserId,
-                    ProjectId = ProjectId,
-                    OrganizationId = OrganizationId,
+                    UserToken = Globals.UserToken,
+                    UserId = Globals.UserId,
+                    ProjectId = Globals.ProjectId,
+                    OrganizationId = Globals.OrganizationID,
                     Version = Globals.Version,
                     DeployId = algorithmId,
                     Parameters = parameters,
@@ -165,17 +191,23 @@ namespace QuantConnect.Queues
                     Log.Error(err, $"Error resolving BrokerageData for live job for brokerage {liveJob.Brokerage}");
                 }
 
-                foreach (var dataHandlerName in dataHandlers.DeserializeList())
+                var brokerageBasedHistoryProvider = liveJob.HistoryProvider.DeserializeList().Select(x =>
+                {
+                    HistoryExtensions.TryGetBrokerageName(x, out var brokerageName);
+                    return brokerageName;
+                }).Where(x => x != null);
+
+                foreach (var dataHandlerName in dataHandlers.DeserializeList().Concat(brokerageBasedHistoryProvider).Distinct())
                 {
                     var brokerageFactoryForDataHandler = GetFactoryFromDataQueueHandler(dataHandlerName);
                     if (brokerageFactoryForDataHandler == null)
                     {
-                        Log.Trace($"JobQueue.NextJob(): Not able to fetch data handler factory with name: {dataHandlerName}");
+                        Log.Trace($"JobQueue.NextJob(): Not able to fetch brokerage factory with name: {dataHandlerName}");
                         continue;
                     }
                     if (brokerageFactoryForDataHandler.BrokerageType == brokerageName)
                     {
-                        //Don't need to add brokearageData again if added by brokerage
+                        //Don't need to add brokerageData again if added by brokerage
                         continue;
                     }
                     foreach (var data in brokerageFactoryForDataHandler.BrokerageData)
@@ -185,14 +217,8 @@ namespace QuantConnect.Queues
                             //live holdings & cash balance not required for data handler
                             continue;
                         }
-                        else if (!liveJob.BrokerageData.ContainsKey(data.Key))
-                        {
-                            liveJob.BrokerageData.Add(data.Key, data.Value);
-                        }
-                        else
-                        {
-                            throw new ArgumentException($"JobQueue.NextJob(): Key already exists in BrokerageData -- {data.Key}");
-                        }
+
+                        liveJob.BrokerageData.TryAdd(data.Key, data.Value);
                     }
                 }
                 return liveJob;
@@ -206,10 +232,10 @@ namespace QuantConnect.Queues
                 Algorithm = File.ReadAllBytes(AlgorithmLocation),
                 HistoryProvider = Config.Get("history-provider", DefaultHistoryProvider),
                 Channel = Channel,
-                UserToken = AccessToken,
-                UserId = UserId,
-                ProjectId = ProjectId,
-                OrganizationId = OrganizationId,
+                UserToken = Globals.UserToken,
+                UserId = Globals.UserId,
+                ProjectId = Globals.ProjectId,
+                OrganizationId = Globals.OrganizationID,
                 Version = Globals.Version,
                 BacktestId = algorithmId,
                 Language = Language,
@@ -218,6 +244,14 @@ namespace QuantConnect.Queues
                 PythonVirtualEnvironment = Config.Get("python-venv"),
                 DeploymentTarget = DeploymentTarget.LocalPlatform,
             };
+
+            var outOfSampleMaxEndDate = Config.Get("out-of-sample-max-end-date");
+            if (!string.IsNullOrEmpty(outOfSampleMaxEndDate))
+            {
+                backtestJob.OutOfSampleMaxEndDate = Time.ParseDate(outOfSampleMaxEndDate);
+            }
+            backtestJob.OutOfSampleDays = Config.GetInt("out-of-sample-days");
+
             // Only set optimization id when backtest is for optimization
             if (!optimizationId.IsNullOrEmpty())
             {

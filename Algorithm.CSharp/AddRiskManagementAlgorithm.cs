@@ -57,7 +57,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -70,34 +70,43 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "3"},
+            {"Total Orders", "3"},
             {"Average Win", "1.02%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "296.066%"},
             {"Drawdown", "2.200%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "101775.37"},
             {"Net Profit", "1.775%"},
-            {"Sharpe Ratio", "9.373"},
+            {"Sharpe Ratio", "9.34"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "68.302%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.105"},
+            {"Alpha", "0.106"},
             {"Beta", "1.021"},
             {"Annual Standard Deviation", "0.227"},
             {"Annual Variance", "0.052"},
             {"Information Ratio", "25.083"},
             {"Tracking Error", "0.006"},
-            {"Treynor Ratio", "2.086"},
+            {"Treynor Ratio", "2.079"},
             {"Total Fees", "$10.33"},
             {"Estimated Strategy Capacity", "$38000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
             {"Portfolio Turnover", "59.74%"},
-            {"OrderListHash", "af3a9c98c190d1b6b36fad184e796b0b"}
+            {"Drawdown Recovery", "3"},
+            {"OrderListHash", "5d7657ec9954875eca633bed711085d3"}
         };
     }
 }

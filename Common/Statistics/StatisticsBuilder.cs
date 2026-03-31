@@ -16,6 +16,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using QuantConnect.Data;
 using QuantConnect.Securities;
 using QuantConnect.Util;
 
@@ -37,26 +39,30 @@ namespace QuantConnect.Statistics
         /// <param name="pointsPortfolioTurnover">The list of portfolio turnover daily samples</param>
         /// <param name="startingCapital">The algorithm starting capital</param>
         /// <param name="totalFees">The total fees</param>
-        /// <param name="totalTransactions">The total number of transactions</param>
+        /// <param name="totalOrders">The total number of transactions</param>
         /// <param name="estimatedStrategyCapacity">The estimated capacity of this strategy</param>
         /// <param name="accountCurrencySymbol">The account currency symbol</param>
         /// <param name="transactions">
         /// The transaction manager to get number of winning and losing transactions
         /// </param>
+        /// <param name="riskFreeInterestRateModel">The risk free interest rate model to use</param>
+        /// <param name="tradingDaysPerYear">The number of trading days per year</param>       
         /// <returns>Returns a <see cref="StatisticsResults"/> object</returns>
         public static StatisticsResults Generate(
             List<Trade> trades,
             SortedDictionary<DateTime, decimal> profitLoss,
-            List<ChartPoint> pointsEquity,
-            List<ChartPoint> pointsPerformance,
-            List<ChartPoint> pointsBenchmark,
-            List<ChartPoint> pointsPortfolioTurnover,
+            List<ISeriesPoint> pointsEquity,
+            List<ISeriesPoint> pointsPerformance,
+            List<ISeriesPoint> pointsBenchmark,
+            List<ISeriesPoint> pointsPortfolioTurnover,
             decimal startingCapital,
             decimal totalFees,
-            int totalTransactions,
+            int totalOrders,
             CapacityEstimate estimatedStrategyCapacity,
             string accountCurrencySymbol,
-            SecurityTransactionManager transactions)
+            SecurityTransactionManager transactions,
+            IRiskFreeInterestRateModel riskFreeInterestRateModel,
+            int tradingDaysPerYear)
         {
             var equity = ChartPointToDictionary(pointsEquity);
 
@@ -64,10 +70,10 @@ namespace QuantConnect.Statistics
             var lastDate = equity.Keys.LastOrDefault().Date;
 
             var totalPerformance = GetAlgorithmPerformance(firstDate, lastDate, trades, profitLoss, equity, pointsPerformance, pointsBenchmark,
-                pointsPortfolioTurnover, startingCapital, transactions);
+                pointsPortfolioTurnover, startingCapital, transactions, riskFreeInterestRateModel, tradingDaysPerYear);
             var rollingPerformances = GetRollingPerformances(firstDate, lastDate, trades, profitLoss, equity, pointsPerformance, pointsBenchmark,
-                pointsPortfolioTurnover, startingCapital, transactions);
-            var summary = GetSummary(totalPerformance, estimatedStrategyCapacity, totalFees, totalTransactions, accountCurrencySymbol);
+                pointsPortfolioTurnover, startingCapital, transactions, riskFreeInterestRateModel, tradingDaysPerYear);
+            var summary = GetSummary(totalPerformance, estimatedStrategyCapacity, totalFees, totalOrders, accountCurrencySymbol);
 
             return new StatisticsResults(totalPerformance, rollingPerformances, summary);
         }
@@ -87,6 +93,8 @@ namespace QuantConnect.Statistics
         /// <param name="transactions">
         /// The transaction manager to get number of winning and losing transactions
         /// </param>
+        /// <param name="riskFreeInterestRateModel">The risk free interest rate model to use</param>
+        /// <param name="tradingDaysPerYear">The number of trading days per year</param>
         /// <returns>The algorithm performance</returns>
         private static AlgorithmPerformance GetAlgorithmPerformance(
             DateTime fromDate,
@@ -94,11 +102,13 @@ namespace QuantConnect.Statistics
             List<Trade> trades,
             SortedDictionary<DateTime, decimal> profitLoss,
             SortedDictionary<DateTime, decimal> equity,
-            List<ChartPoint> pointsPerformance,
-            List<ChartPoint> pointsBenchmark,
-            List<ChartPoint> pointsPortfolioTurnover,
+            List<ISeriesPoint> pointsPerformance,
+            List<ISeriesPoint> pointsBenchmark,
+            List<ISeriesPoint> pointsPortfolioTurnover,
             decimal startingCapital,
-            SecurityTransactionManager transactions)
+            SecurityTransactionManager transactions,
+            IRiskFreeInterestRateModel riskFreeInterestRateModel,
+            int tradingDaysPerYear)
         {
             var periodEquity = new SortedDictionary<DateTime, decimal>(equity.Where(x => x.Key.Date >= fromDate && x.Key.Date < toDate.AddDays(1)).ToDictionary(x => x.Key, y => y.Value));
 
@@ -135,7 +145,7 @@ namespace QuantConnect.Statistics
             var runningCapital = equity.Count == periodEquity.Count ? startingCapital : periodEquity.Values.FirstOrDefault();
 
             return new AlgorithmPerformance(periodTrades, periodProfitLoss, periodEquity, portfolioTurnover, listPerformance, listBenchmark,
-                runningCapital, periodWinCount, periodLossCount);
+                runningCapital, periodWinCount, periodLossCount, riskFreeInterestRateModel, tradingDaysPerYear);
         }
 
         /// <summary>
@@ -153,6 +163,8 @@ namespace QuantConnect.Statistics
         /// <param name="transactions">
         /// The transaction manager to get number of winning and losing transactions
         /// </param>
+        /// <param name="riskFreeInterestRateModel">The risk free interest rate model to use</param>
+        /// <param name="tradingDaysPerYear">The number of trading days per year</param>
         /// <returns>A dictionary with the rolling performances</returns>
         private static Dictionary<string, AlgorithmPerformance> GetRollingPerformances(
             DateTime firstDate,
@@ -160,11 +172,13 @@ namespace QuantConnect.Statistics
             List<Trade> trades,
             SortedDictionary<DateTime, decimal> profitLoss,
             SortedDictionary<DateTime, decimal> equity,
-            List<ChartPoint> pointsPerformance,
-            List<ChartPoint> pointsBenchmark,
-            List<ChartPoint> pointsPortfolioTurnover,
+            List<ISeriesPoint> pointsPerformance,
+            List<ISeriesPoint> pointsBenchmark,
+            List<ISeriesPoint> pointsPortfolioTurnover,
             decimal startingCapital,
-            SecurityTransactionManager transactions)
+            SecurityTransactionManager transactions,
+            IRiskFreeInterestRateModel riskFreeInterestRateModel,
+            int tradingDaysPerYear)
         {
             var rollingPerformances = new Dictionary<string, AlgorithmPerformance>();
 
@@ -177,7 +191,7 @@ namespace QuantConnect.Statistics
                 {
                     var key = $"M{monthPeriod}_{period.EndDate.ToStringInvariant("yyyyMMdd")}";
                     var periodPerformance = GetAlgorithmPerformance(period.StartDate, period.EndDate, trades, profitLoss, equity, pointsPerformance,
-                        pointsBenchmark, pointsPortfolioTurnover, startingCapital, transactions);
+                        pointsBenchmark, pointsPortfolioTurnover, startingCapital, transactions, riskFreeInterestRateModel, tradingDaysPerYear);
                     rollingPerformances[key] = periodPerformance;
                 }
             }
@@ -189,7 +203,7 @@ namespace QuantConnect.Statistics
         /// Returns a summary of the algorithm performance as a dictionary
         /// </summary>
         private static Dictionary<string, string> GetSummary(AlgorithmPerformance totalPerformance, CapacityEstimate estimatedStrategyCapacity,
-            decimal totalFees, int totalTransactions, string accountCurrencySymbol)
+            decimal totalFees, int totalOrders, string accountCurrencySymbol)
         {
             var capacity = 0m;
             var lowestCapacitySymbol = Symbol.Empty;
@@ -201,14 +215,17 @@ namespace QuantConnect.Statistics
 
             return new Dictionary<string, string>
             {
-                { PerformanceMetrics.TotalTrades, totalTransactions.ToStringInvariant() },
+                { PerformanceMetrics.TotalOrders, totalOrders.ToStringInvariant() },
                 { PerformanceMetrics.AverageWin, Math.Round(totalPerformance.PortfolioStatistics.AverageWinRate.SafeMultiply100(), 2).ToStringInvariant() + "%"  },
                 { PerformanceMetrics.AverageLoss, Math.Round(totalPerformance.PortfolioStatistics.AverageLossRate.SafeMultiply100(), 2).ToStringInvariant() + "%" },
                 { PerformanceMetrics.CompoundingAnnualReturn, Math.Round(totalPerformance.PortfolioStatistics.CompoundingAnnualReturn.SafeMultiply100(), 3).ToStringInvariant() + "%" },
                 { PerformanceMetrics.Drawdown, Math.Round(totalPerformance.PortfolioStatistics.Drawdown.SafeMultiply100(), 3).ToStringInvariant() + "%" },
                 { PerformanceMetrics.Expectancy, Math.Round(totalPerformance.PortfolioStatistics.Expectancy, 3).ToStringInvariant() },
+                { PerformanceMetrics.StartEquity, Math.Round(totalPerformance.PortfolioStatistics.StartEquity, 2).ToStringInvariant() },
+                { PerformanceMetrics.EndEquity, Math.Round(totalPerformance.PortfolioStatistics.EndEquity, 2).ToStringInvariant() },
                 { PerformanceMetrics.NetProfit, Math.Round(totalPerformance.PortfolioStatistics.TotalNetProfit.SafeMultiply100(), 3).ToStringInvariant() + "%"},
                 { PerformanceMetrics.SharpeRatio, Math.Round((double)totalPerformance.PortfolioStatistics.SharpeRatio, 3).ToStringInvariant() },
+                { PerformanceMetrics.SortinoRatio, Math.Round((double)totalPerformance.PortfolioStatistics.SortinoRatio, 3).ToStringInvariant() },
                 { PerformanceMetrics.ProbabilisticSharpeRatio, Math.Round(totalPerformance.PortfolioStatistics.ProbabilisticSharpeRatio.SafeMultiply100(), 3).ToStringInvariant() + "%"},
                 { PerformanceMetrics.LossRate, Math.Round(totalPerformance.PortfolioStatistics.LossRate.SafeMultiply100()).ToStringInvariant() + "%" },
                 { PerformanceMetrics.WinRate, Math.Round(totalPerformance.PortfolioStatistics.WinRate.SafeMultiply100()).ToStringInvariant() + "%" },
@@ -223,7 +240,8 @@ namespace QuantConnect.Statistics
                 { PerformanceMetrics.TotalFees, accountCurrencySymbol + totalFees.ToStringInvariant("0.00") },
                 { PerformanceMetrics.EstimatedStrategyCapacity, accountCurrencySymbol + capacity.RoundToSignificantDigits(2).ToStringInvariant() },
                 { PerformanceMetrics.LowestCapacityAsset, lowestCapacitySymbol != Symbol.Empty ? lowestCapacitySymbol.ID.ToString() : "" },
-                { PerformanceMetrics.PortfolioTurnover, Math.Round(totalPerformance.PortfolioStatistics.PortfolioTurnover.SafeMultiply100(), 2).ToStringInvariant() + "%" }
+                { PerformanceMetrics.PortfolioTurnover, Math.Round(totalPerformance.PortfolioStatistics.PortfolioTurnover.SafeMultiply100(), 2).ToStringInvariant() + "%" },
+                { PerformanceMetrics.DrawdownRecovery, totalPerformance.PortfolioStatistics.DrawdownRecovery.ToStringInvariant() },
             };
         }
 
@@ -280,21 +298,33 @@ namespace QuantConnect.Statistics
         /// <param name="fromDate">An optional starting date</param>
         /// <param name="toDate">An optional ending date</param>
         /// <returns>SortedDictionary of the equity decimal values ordered in time</returns>
-        private static SortedDictionary<DateTime, decimal> ChartPointToDictionary(IEnumerable<ChartPoint> points, DateTime? fromDate = null, DateTime? toDate = null)
+        private static SortedDictionary<DateTime, decimal> ChartPointToDictionary(IEnumerable<ISeriesPoint> points, DateTime? fromDate = null, DateTime? toDate = null)
         {
             var dictionary = new SortedDictionary<DateTime, decimal>();
 
             foreach (var point in points)
             {
-                var x = Time.UnixTimeStampToDateTime(point.x);
+                if (fromDate != null && point.Time.Date < fromDate) continue;
+                if (toDate != null && point.Time.Date >= ((DateTime)toDate).AddDays(1)) break;
 
-                if (fromDate != null && x.Date < fromDate) continue;
-                if (toDate != null && x.Date >= ((DateTime)toDate).AddDays(1)) break;
-
-                dictionary[x] = point.y;
+                dictionary[point.Time] = GetPointValue(point);
             }
 
             return dictionary;
+        }
+
+        /// <summary>
+        /// Gets the value of a point, either ChartPoint.y or Candlestick.Close
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static decimal GetPointValue(ISeriesPoint point)
+        {
+            if (point is ChartPoint)
+            {
+                return ((ChartPoint)point).y.Value;
+            }
+
+            return ((Candlestick)point).Close.Value;
         }
 
         /// <summary>

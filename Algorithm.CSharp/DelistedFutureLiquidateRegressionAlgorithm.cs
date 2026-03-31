@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
+using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
@@ -30,6 +31,7 @@ namespace QuantConnect.Algorithm.CSharp
     public class DelistedFutureLiquidateRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         private Symbol _contractSymbol;
+        private bool _contractRemoved;
         protected virtual Resolution Resolution => Resolution.Minute;
 
         /// <summary>
@@ -65,12 +67,25 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
+        public override void OnSecuritiesChanged(SecurityChanges changes)
+        {
+            if (changes.RemovedSecurities.Any(x => x.Symbol == _contractSymbol))
+            {
+                _contractRemoved = true;
+            }
+        }
+
         public override void OnEndOfAlgorithm()
         {
+            if (!_contractRemoved)
+            {
+                throw new RegressionTestException($"Contract {_contractSymbol} was not removed from the algorithm");
+            }
+
             Log($"{_contractSymbol}: {Securities[_contractSymbol].Invested}");
             if (Securities[_contractSymbol].Invested)
             {
-                throw new Exception($"Position should be closed when {_contractSymbol} got delisted {_contractSymbol.ID.Date}");
+                throw new RegressionTestException($"Position should be closed when {_contractSymbol} got delisted {_contractSymbol.ID.Date}");
             }
         }
 
@@ -87,12 +102,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public virtual long DataPoints => 518729;
+        public virtual long DataPoints => 288140;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -100,34 +115,43 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "2"},
+            {"Total Orders", "2"},
             {"Average Win", "7.02%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "34.386%"},
             {"Drawdown", "1.500%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "107016.6"},
             {"Net Profit", "7.017%"},
-            {"Sharpe Ratio", "3.306"},
+            {"Sharpe Ratio", "3.217"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "99.828%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.234"},
+            {"Alpha", "0.228"},
             {"Beta", "0.108"},
             {"Annual Standard Deviation", "0.084"},
             {"Annual Variance", "0.007"},
             {"Information Ratio", "-1.122"},
             {"Tracking Error", "0.112"},
-            {"Treynor Ratio", "2.571"},
+            {"Treynor Ratio", "2.501"},
             {"Total Fees", "$2.15"},
             {"Estimated Strategy Capacity", "$1700000000.00"},
             {"Lowest Capacity Asset", "ES VMKLFZIH2MTD"},
             {"Portfolio Turnover", "2.01%"},
-            {"OrderListHash", "72b6408c884da76f55bb74ba4502a5ba"}
+            {"Drawdown Recovery", "16"},
+            {"OrderListHash", "640ce720644ff0b580687e80105d0a92"}
         };
     }
 }

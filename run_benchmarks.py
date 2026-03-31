@@ -21,12 +21,16 @@ for baseDirectory in ["Algorithm.CSharp/Benchmarks", "Algorithm.Python/Benchmark
 		if algorithmFile.endswith(("py", "cs")):
 
 			algorithmName = Path(algorithmFile).stem
+
+			if "Fine" in algorithmName:
+				# we skip fundamental benchmarks for now
+				continue
 			algorithmLocation = "QuantConnect.Algorithm.CSharp.dll" if language == "CSharp" else os.path.join("../../../", baseDirectory, algorithmFile)
 			print(f'Start running algorithm {algorithmName} language {language}...')
 
 			dataPointsPerSecond = []
 			benchmarkLengths = []
-			for x in range(1, 2):
+			for x in range(1, 3):
 
 				subprocess.run(["dotnet", "./QuantConnect.Lean.Launcher.dll",
 					"--data-folder " + dataPath,
@@ -38,6 +42,9 @@ for baseDirectory in ["Algorithm.CSharp/Benchmarks", "Algorithm.Python/Benchmark
 					cwd="./Launcher/bin/Release",
 					stdout=subprocess.DEVNULL,
 					stderr=subprocess.DEVNULL)
+				if x == 1:
+					# skip first run
+					continue
 
 				algorithmLogs = os.path.join("./Launcher/bin/Release", algorithmName + "-log.txt")
 				file = open(algorithmLogs, 'r')

@@ -53,7 +53,7 @@ namespace QuantConnect.Algorithm.CSharp
             var quantity = CalculateOrderQuantity(_spy, 1m);
             if (quantity % 100 != 0)
             {
-                throw new Exception($"CustomBuyingPowerModel only allow quantity that is multiple of 100 and {quantity} was found");
+                throw new RegressionTestException($"CustomBuyingPowerModel only allow quantity that is multiple of 100 and {quantity} was found");
             }
 
             // We normally get insufficient buying power model, but the
@@ -96,7 +96,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -109,34 +109,43 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "1"},
+            {"Total Orders", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "4775.196%"},
             {"Drawdown", "21.600%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "138618.81"},
             {"Net Profit", "38.619%"},
-            {"Sharpe Ratio", "14.33"},
+            {"Sharpe Ratio", "14.322"},
+            {"Sortino Ratio", "26.701"},
             {"Probabilistic Sharpe Ratio", "75.756%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "10.389"},
+            {"Alpha", "10.447"},
             {"Beta", "8.754"},
             {"Annual Standard Deviation", "0.95"},
             {"Annual Variance", "0.903"},
             {"Information Ratio", "15.703"},
             {"Tracking Error", "0.844"},
-            {"Treynor Ratio", "1.555"},
+            {"Treynor Ratio", "1.554"},
             {"Total Fees", "$30.00"},
             {"Estimated Strategy Capacity", "$150000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
             {"Portfolio Turnover", "26.62%"},
-            {"OrderListHash", "eba70a03119f2e8fe526d1092fbc36d0"}
+            {"Drawdown Recovery", "9"},
+            {"OrderListHash", "dae7e349316dce7621bc1f8be86ccd0d"}
         };
     }
 }

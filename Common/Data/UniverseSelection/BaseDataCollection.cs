@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +18,7 @@ using System;
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using QuantConnect.Python;
 
 namespace QuantConnect.Data.UniverseSelection
 {
@@ -31,12 +32,14 @@ namespace QuantConnect.Data.UniverseSelection
         /// <summary>
         /// The associated underlying price data if any
         /// </summary>
+        [PandasNonExpandable]
         public BaseData Underlying { get; set; }
 
         /// <summary>
         /// Gets or sets the contracts selected by the universe
         /// </summary>
-        public IReadOnlyCollection<Symbol> FilteredContracts { get; set; }
+        [PandasIgnore]
+        public HashSet<Symbol> FilteredContracts { get; set; }
 
         /// <summary>
         /// Gets the data list
@@ -46,10 +49,22 @@ namespace QuantConnect.Data.UniverseSelection
         /// <summary>
         /// Gets or sets the end time of this data
         /// </summary>
+        [PandasIgnore]
         public override DateTime EndTime
         {
-            get { return _endTime; }
-            set { _endTime = value; }
+            get
+            {
+                if (_endTime == default)
+                {
+                    // to be user friendly let's return Time if not set, like BaseData does
+                    return Time;
+                }
+                return _endTime;
+            }
+            set
+            {
+                _endTime = value;
+            }
         }
 
         /// <summary>
@@ -80,7 +95,7 @@ namespace QuantConnect.Data.UniverseSelection
         /// <param name="data">The data to add to this collection</param>
         /// <param name="underlying">The associated underlying price data if any</param>
         /// <param name="filteredContracts">The contracts selected by the universe</param>
-        public BaseDataCollection(DateTime time, DateTime endTime, Symbol symbol, IEnumerable<BaseData> data = null, BaseData underlying = null, IReadOnlyCollection<Symbol> filteredContracts = null)
+        public BaseDataCollection(DateTime time, DateTime endTime, Symbol symbol, IEnumerable<BaseData> data = null, BaseData underlying = null, HashSet<Symbol> filteredContracts = null)
             : this(time, endTime, symbol, data != null ? data.ToList() : new List<BaseData>(), underlying, filteredContracts)
         {
         }
@@ -94,14 +109,65 @@ namespace QuantConnect.Data.UniverseSelection
         /// <param name="data">The data to add to this collection</param>
         /// <param name="underlying">The associated underlying price data if any</param>
         /// <param name="filteredContracts">The contracts selected by the universe</param>
-        public BaseDataCollection(DateTime time, DateTime endTime, Symbol symbol, List<BaseData> data, BaseData underlying, IReadOnlyCollection<Symbol> filteredContracts)
+        public BaseDataCollection(DateTime time, DateTime endTime, Symbol symbol, List<BaseData> data, BaseData underlying, HashSet<Symbol> filteredContracts)
+            : this(time, endTime, symbol, underlying, filteredContracts)
+        {
+            if (data != null && data.Count == 1 && data[0] is BaseDataCollection collection && collection.Data != null && collection.Data.Count > 0)
+            {
+                // we were given a base data collection, let's be nice and fetch it's data if it has any
+                Data = collection.Data;
+            }
+            else
+            {
+                Data = data ?? new List<BaseData>();
+            }
+        }
+
+        /// <summary>
+        /// Helper method to create an instance without setting the data list
+        /// </summary>
+        protected BaseDataCollection(DateTime time, DateTime endTime, Symbol symbol, BaseData underlying, HashSet<Symbol> filteredContracts)
         {
             Symbol = symbol;
             Time = time;
             _endTime = endTime;
             Underlying = underlying;
             FilteredContracts = filteredContracts;
-            Data = data ?? new List<BaseData>();
+        }
+
+        /// <summary>
+        /// Copy constructor for <see cref="BaseDataCollection"/>
+        /// </summary>
+        /// <param name="other">The base data collection being copied</param>
+        public BaseDataCollection(BaseDataCollection other)
+            : this(other.Time, other.EndTime, other.Symbol, other.Underlying, other.FilteredContracts)
+        {
+            Data = other.Data;
+        }
+
+        /// <summary>
+        /// Creates the universe symbol for the target market
+        /// </summary>
+        /// <returns>The universe symbol to use</returns>
+        public virtual Symbol UniverseSymbol(string market = null)
+        {
+            market ??= QuantConnect.Market.USA;
+            var ticker = $"{GetType().Name}-{market}-{Guid.NewGuid()}";
+            return Symbol.Create(ticker, SecurityType.Base, market, baseDataType: GetType());
+        }
+
+        /// <summary>
+        /// Indicates whether this contains data that should be stored in the security cache
+        /// </summary>
+        /// <returns>Whether this contains data that should be stored in the security cache</returns>
+        public override bool ShouldCacheToSecurity()
+        {
+            if (Data == null || Data.Count == 0)
+            {
+                return true;
+            }
+            // if we hold the same data type we are, else we ask underlying type
+            return Data[0].GetType() == GetType() || Data[0].ShouldCacheToSecurity();
         }
 
         /// <summary>
@@ -131,7 +197,7 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>A clone of the current object</returns>
         public override BaseData Clone()
         {
-            return new BaseDataCollection(Time, EndTime, Symbol, Data, Underlying, FilteredContracts);
+            return new BaseDataCollection(this);
         }
 
         /// <summary>

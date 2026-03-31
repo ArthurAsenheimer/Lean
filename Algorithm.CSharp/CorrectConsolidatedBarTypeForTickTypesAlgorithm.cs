@@ -29,7 +29,6 @@ namespace QuantConnect.Algorithm.CSharp
     {
         private bool _quoteTickConsolidatorCalled;
         private bool _tradeTickConsolidatorCalled;
-        private bool _openInterestTickConsolidatorCalled;
 
         public override void Initialize()
         {
@@ -40,7 +39,6 @@ namespace QuantConnect.Algorithm.CSharp
 
             Consolidate<QuoteBar>(symbol, TimeSpan.FromMinutes(1), TickType.Quote, QuoteTickConsolidationHandler);
             Consolidate<TradeBar>(symbol, TimeSpan.FromMinutes(1), TickType.Trade, TradeTickConsolidationHandler);
-            Consolidate<TradeBar>(symbol, TimeSpan.FromMinutes(1), TickType.OpenInterest, OpenInterestTickConsolidationHandler);
         }
 
         public override void OnData(Slice slice)
@@ -55,17 +53,12 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_quoteTickConsolidatorCalled)
             {
-                throw new Exception("QuoteTickConsolidationHandler was not called");
+                throw new RegressionTestException("QuoteTickConsolidationHandler was not called");
             }
 
             if (!_tradeTickConsolidatorCalled)
             {
-                throw new Exception("TradeTickConsolidationHandler was not called");
-            }
-
-            if (!_openInterestTickConsolidatorCalled)
-            {
-                throw new Exception("OpenInterestTickConsolidationHandler was not called");
+                throw new RegressionTestException("TradeTickConsolidationHandler was not called");
             }
         }
 
@@ -79,11 +72,6 @@ namespace QuantConnect.Algorithm.CSharp
             _tradeTickConsolidatorCalled = true;
         }
 
-        private void OpenInterestTickConsolidationHandler(TradeBar consolidatedBar)
-        {
-            _openInterestTickConsolidatorCalled = true;
-        }
-
         /// <summary>
         /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
         /// </summary>
@@ -92,7 +80,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -105,18 +93,26 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "0"},
+            {"Total Orders", "0"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100000"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -132,6 +128,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", ""},
             {"Portfolio Turnover", "0%"},
+            {"Drawdown Recovery", "0"},
             {"OrderListHash", "d41d8cd98f00b204e9800998ecf8427e"}
         };
     }

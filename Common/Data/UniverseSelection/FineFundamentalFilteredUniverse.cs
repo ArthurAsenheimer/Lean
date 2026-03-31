@@ -38,6 +38,11 @@ namespace QuantConnect.Data.UniverseSelection
         public FineFundamentalFilteredUniverse(Universe universe, Func<IEnumerable<FineFundamental>, IEnumerable<Symbol>> fineSelector)
             : base(universe, universe.SelectSymbols)
         {
+            if (universe is CoarseFundamentalUniverse && universe.UniverseSettings.Asynchronous.HasValue && universe.UniverseSettings.Asynchronous.Value)
+            {
+                throw new ArgumentException("Asynchronous universe setting is not supported for coarse & fine selections, please use the new Fundamental single pass selection");
+            }
+
             FineFundamentalUniverse = new FineFundamentalUniverse(universe.UniverseSettings, fineSelector);
             FineFundamentalUniverse.SelectionChanged += (sender, args) => OnSelectionChanged(((SelectionEventArgs) args).CurrentSelection);
         }
@@ -50,7 +55,7 @@ namespace QuantConnect.Data.UniverseSelection
         public FineFundamentalFilteredUniverse(Universe universe, PyObject fineSelector)
             : base(universe, universe.SelectSymbols)
         {
-            var func = fineSelector.ConvertToDelegate<Func< IEnumerable<FineFundamental>, object>>();
+            var func = fineSelector.SafeAs<Func< IEnumerable<FineFundamental>, object>>();
             FineFundamentalUniverse = new FineFundamentalUniverse(universe.UniverseSettings, func.ConvertToUniverseSelectionSymbolDelegate());
             FineFundamentalUniverse.SelectionChanged += (sender, args) => OnSelectionChanged(((SelectionEventArgs)args).CurrentSelection);
         }

@@ -16,7 +16,6 @@
 
 using System;
 using System.Collections.Generic;
-using QuantConnect.Brokerages;
 using QuantConnect.Data;
 using QuantConnect.Securities;
 using QuantConnect.Data.Shortable;
@@ -52,13 +51,20 @@ namespace QuantConnect.Algorithm.CSharp
             _aig.SetShortableProvider(new RegressionTestShortableProvider());
         }
 
-        public override void OnData(Slice data)
+        public override void OnData(Slice slice)
         {
             if (!_initialize)
             {
                 HandleOrder(LimitOrder(_spy.Symbol, -1001, 10000m)); // Should be canceled, exceeds the max shortable quantity
-                HandleOrder(LimitOrder(_spy.Symbol, -1000, 10000m)); // Allowed, orders at or below 1000 should be accepted
+                var orderTicket = LimitOrder(_spy.Symbol, -1000, 10000m);
+                HandleOrder(orderTicket); // Allowed, orders at or below 1000 should be accepted
                 HandleOrder(LimitOrder(_spy.Symbol, -10, 0.01m)); // Should be canceled, the total quantity we would be short would exceed the max shortable quantity.
+
+                var response = orderTicket.UpdateQuantity(-999); // should be allowed, we are reducing the quantity we want to short
+                if(!response.IsSuccess)
+                {
+                    throw new RegressionTestException("Order update should of succeeded!");
+                }
                 _initialize = true;
                 return;
             }
@@ -67,11 +73,11 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (_ordersAllowed.Count != 1)
                 {
-                    throw new Exception($"Expected 1 successful order, found: {_ordersAllowed.Count}");
+                    throw new RegressionTestException($"Expected 1 successful order, found: {_ordersAllowed.Count}");
                 }
                 if (_ordersDenied.Count != 2)
                 {
-                    throw new Exception($"Expected 2 failed orders, found: {_ordersDenied.Count}");
+                    throw new RegressionTestException($"Expected 2 failed orders, found: {_ordersDenied.Count}");
                 }
 
                 var allowedOrder = _ordersAllowed[0];
@@ -85,13 +91,13 @@ namespace QuantConnect.Algorithm.CSharp
                 var response = allowedOrder.Update(orderUpdate);
                 if (response.ErrorCode != OrderResponseErrorCode.ExceedsShortableQuantity)
                 {
-                    throw new Exception($"Expected order to fail due to exceeded shortable quantity, found: {response.ErrorCode.ToString()}");
+                    throw new RegressionTestException($"Expected order to fail due to exceeded shortable quantity, found: {response.ErrorCode.ToString()}");
                 }
 
                 var cancelResponse = allowedOrder.Cancel();
                 if (cancelResponse.IsError)
                 {
-                    throw new Exception("Expected to be able to cancel open order after bad qty update");
+                    throw new RegressionTestException("Expected to be able to cancel open order after bad qty update");
                 }
 
                 _invalidatedAllowedOrder = true;
@@ -106,13 +112,13 @@ namespace QuantConnect.Algorithm.CSharp
                 var spyShares = Portfolio[_spy.Symbol].Quantity;
                 if (spyShares != -1000m)
                 {
-                    throw new Exception($"Expected -1000 shares in portfolio, found: {spyShares}");
+                    throw new RegressionTestException($"Expected -1000 shares in portfolio, found: {spyShares}");
                 }
 
                 HandleOrder(LimitOrder(_spy.Symbol, -1, 0.01m)); // Should fail, portfolio holdings are at the max shortable quantity.
                 if (_ordersDenied.Count != 1)
                 {
-                    throw new Exception($"Expected limit order to fail due to existing holdings, but found {_ordersDenied.Count} failures");
+                    throw new RegressionTestException($"Expected limit order to fail due to existing holdings, but found {_ordersDenied.Count} failures");
                 }
 
                 _ordersAllowed.Clear();
@@ -121,7 +127,7 @@ namespace QuantConnect.Algorithm.CSharp
                 HandleOrder(MarketOrder(_aig.Symbol, -1001));
                 if (_ordersAllowed.Count != 1)
                 {
-                    throw new Exception($"Expected market order of -1001 BAC to not fail");
+                    throw new RegressionTestException($"Expected market order of -1001 BAC to not fail");
                 }
 
                 _invalidatedNewOrderWithPortfolioHoldings = true;
@@ -139,7 +145,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (_lastOrderEvent == null || _lastOrderEvent.Status != OrderStatus.Invalid)
                 {
-                    throw new Exception($"Expected order event with invalid status for ticket {orderTicket}");
+                    throw new RegressionTestException($"Expected order event with invalid status for ticket {orderTicket}");
                 }
 
                 _lastOrderEvent = null;
@@ -152,7 +158,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private class RegressionTestShortableProvider : LocalDiskShortableProvider
         {
-            public RegressionTestShortableProvider() : base(SecurityType.Equity, "testbrokerage", Market.USA)
+            public RegressionTestShortableProvider() : base("testbrokerage")
             {
             }
         }
@@ -165,7 +171,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -178,34 +184,43 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "2"},
+            {"Total Orders", "6"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "-1.623%"},
             {"Drawdown", "0.100%"},
             {"Expectancy", "0"},
+            {"Start Equity", "10000000"},
+            {"End Equity", "9996563.97"},
             {"Net Profit", "-0.034%"},
-            {"Sharpe Ratio", "-1.535"},
+            {"Sharpe Ratio", "-3.52"},
+            {"Sortino Ratio", "-3.476"},
             {"Probabilistic Sharpe Ratio", "33.979%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.002"},
+            {"Alpha", "-0.006"},
             {"Beta", "-0.022"},
             {"Annual Standard Deviation", "0.004"},
             {"Annual Variance", "0"},
             {"Information Ratio", "-2.082"},
             {"Tracking Error", "0.179"},
-            {"Treynor Ratio", "0.269"},
+            {"Treynor Ratio", "0.616"},
             {"Total Fees", "$10.01"},
             {"Estimated Strategy Capacity", "$99000000.00"},
             {"Lowest Capacity Asset", "AIG R735QTJ8XC9X"},
             {"Portfolio Turnover", "0.23%"},
-            {"OrderListHash", "3ac2d7a61f71c1345eb569e30cc2834c"}
+            {"Drawdown Recovery", "3"},
+            {"OrderListHash", "6d92f0811c31864dfaaccd9eb2edac52"}
         };
     }
 }

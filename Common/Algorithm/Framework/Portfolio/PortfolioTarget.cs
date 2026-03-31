@@ -18,6 +18,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using System.Collections.Generic;
 using QuantConnect.Securities.Positions;
+using QuantConnect.Algorithm.Framework.Alphas;
 
 namespace QuantConnect.Algorithm.Framework.Portfolio
 {
@@ -45,14 +46,55 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         public decimal Quantity { get; }
 
         /// <summary>
+        /// Portfolio target tag with additional information
+        /// </summary>
+        public string Tag { get; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="PortfolioTarget"/> class
         /// </summary>
         /// <param name="symbol">The symbol this target is for</param>
         /// <param name="quantity">The target quantity</param>
-        public PortfolioTarget(Symbol symbol, decimal quantity)
+        /// <param name="tag">The target tag with additional information</param>
+        public PortfolioTarget(Symbol symbol, decimal quantity, string tag = "")
         {
             Symbol = symbol;
             Quantity = quantity;
+            Tag = tag;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PortfolioTarget"/> class
+        /// </summary>
+        /// <param name="symbol">The symbol this target is for</param>
+        /// <param name="quantity">The target quantity</param>
+        /// <param name="tag">The target tag with additional information</param>
+        public PortfolioTarget(Symbol symbol, int quantity, string tag = "")
+            : this(symbol, (decimal)quantity, tag)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PortfolioTarget"/> class
+        /// </summary>
+        /// <param name="symbol">The symbol this target is for</param>
+        /// <param name="insightDirection">
+        /// The insight direction, which will be used to calculate the target quantity
+        /// (1 for Up, 0 for flat, -1 for down)
+        /// </param>
+        /// <param name="tag">The target tag with additional information</param>
+        public PortfolioTarget(Symbol symbol, InsightDirection insightDirection, string tag = "")
+            : this(symbol,
+                  insightDirection switch
+                  {
+                      InsightDirection.Up => 1m,
+                      InsightDirection.Down => -1m,
+                      InsightDirection.Flat => 0m,
+                      _ => throw new ArgumentOutOfRangeException(nameof(insightDirection), insightDirection,
+                          Messages.PortfolioTarget.InvalidInsightDirection(symbol, insightDirection)),
+                  },
+                  tag)
+        {
         }
 
         /// <summary>
@@ -73,10 +115,24 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// <param name="algorithm">The algorithm instance, used for getting total portfolio value and current security price</param>
         /// <param name="symbol">The symbol the target is for</param>
         /// <param name="percent">The requested target percent of total portfolio value</param>
+        /// <param name="tag">The target tag with additional information</param>
+        /// <returns>A portfolio target for the specified symbol/percent</returns>
+        public static IPortfolioTarget Percent(IAlgorithm algorithm, Symbol symbol, double percent, string tag)
+        {
+            return Percent(algorithm, symbol, percent.SafeDecimalCast(), tag: tag);
+        }
+
+        /// <summary>
+        /// Creates a new target for the specified percent
+        /// </summary>
+        /// <param name="algorithm">The algorithm instance, used for getting total portfolio value and current security price</param>
+        /// <param name="symbol">The symbol the target is for</param>
+        /// <param name="percent">The requested target percent of total portfolio value</param>
         /// <param name="returnDeltaQuantity">True, result quantity will be the Delta required to reach target percent.
         /// False, the result quantity will be the Total quantity to reach the target percent, including current holdings</param>
+        /// <param name="tag">The target tag with additional information</param>
         /// <returns>A portfolio target for the specified symbol/percent</returns>
-        public static IPortfolioTarget Percent(IAlgorithm algorithm, Symbol symbol, decimal percent, bool returnDeltaQuantity = false)
+        public static IPortfolioTarget Percent(IAlgorithm algorithm, Symbol symbol, decimal percent, bool returnDeltaQuantity = false, string tag = "")
         {
             var absolutePercentage = Math.Abs(percent);
             if (absolutePercentage > algorithm.Settings.MaxAbsolutePortfolioTargetPercentage
@@ -133,7 +189,7 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
             var lotSize = security.SymbolProperties.LotSize;
             var quantity = result.NumberOfLots * lotSize + (returnDeltaQuantity ? 0 : security.Holdings.Quantity);
 
-            return new PortfolioTarget(symbol, quantity);
+            return new PortfolioTarget(symbol, quantity, tag);
         }
 
         /// <summary>Returns a string that represents the current object.</summary>

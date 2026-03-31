@@ -64,7 +64,7 @@ namespace QuantConnect.Securities.Crypto
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new GDAXFeeModel(),
-                new ConstantSlippageModel(0),
+                NullSlippageModel.Instance,
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 new CashBuyingPowerModel(),
@@ -107,7 +107,7 @@ namespace QuantConnect.Securities.Crypto
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new GDAXFeeModel(),
-                new ConstantSlippageModel(0),
+                NullSlippageModel.Instance,
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 new CashBuyingPowerModel(),
@@ -146,5 +146,10 @@ namespace QuantConnect.Securities.Crypto
                 throw new InvalidOperationException($"symbol doesn't end with {quoteCurrency}");
             }
         }
+
+        /// <summary>
+        /// Returns the securities symbol
+        /// </summary>
+        public static implicit operator Symbol(Crypto security) => security.Symbol;
     }
 }

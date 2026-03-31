@@ -69,7 +69,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                     if (freeMargin >= freeMarginPostTrade)
                     {
-                        throw new Exception("We expect the margin used to actually be lower once we perform the second trade");
+                        throw new RegressionTestException("We expect the margin used to actually be lower once we perform the second trade");
                     }
                 }
             }
@@ -78,7 +78,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 475788;
+        public override long DataPoints => 15023;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -86,18 +86,26 @@ namespace QuantConnect.Algorithm.CSharp
         public override int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "2"},
+            {"Total Orders", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "998807.85"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -109,11 +117,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$3.25"},
-            {"Estimated Strategy Capacity", "$33000000.00"},
-            {"Lowest Capacity Asset", "GOOCV WBGM95TAH2LI|GOOCV VP83T1ZUHROL"},
+            {"Total Fees", "$7.15"},
+            {"Estimated Strategy Capacity", "$45000000.00"},
+            {"Lowest Capacity Asset", "GOOCV WBGM95TALCX2|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "6.17%"},
-            {"OrderListHash", "354a85b9f17c89e921c3eb57e48ce909"}
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "735ec0801dd3dcf9e03eaf3b67931910"}
         };
     }
 }

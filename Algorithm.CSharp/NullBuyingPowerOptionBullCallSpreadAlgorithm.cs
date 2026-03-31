@@ -47,7 +47,7 @@ namespace QuantConnect.Algorithm.CSharp
             var option = AddOption(equity.Symbol);
             _optionSymbol = option.Symbol;
 
-            option.SetFilter(-2, +2, 0, 180);
+            option.SetFilter(u => u.StandardsOnly().Strikes(-2, +2).Expiration(0, 180));
         }
 
         public override void OnData(Slice slice)
@@ -80,7 +80,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     if (ticket.Status != OrderStatus.Filled)
                     {
-                        throw new Exception($"There should be no restriction on buying {ticket.Quantity} of {ticket.Symbol} with BuyingPowerModel.Null");
+                        throw new RegressionTestException($"There should be no restriction on buying {ticket.Quantity} of {ticket.Symbol} with BuyingPowerModel.Null");
                     }
                 }
             }
@@ -90,7 +90,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (Portfolio.TotalMarginUsed != 0)
             {
-                throw new Exception("The TotalMarginUsed should be zero to avoid margin calls.");
+                throw new RegressionTestException("The TotalMarginUsed should be zero to avoid margin calls.");
             }
         }
 
@@ -102,12 +102,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 475788;
+        public long DataPoints => 15023;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -115,18 +115,26 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new()
         {
-            {"Total Trades", "2"},
+            {"Total Orders", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "200000"},
+            {"End Equity", "108700"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -138,11 +146,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$500.00"},
+            {"Total Fees", "$1300.00"},
             {"Estimated Strategy Capacity", "$36000.00"},
-            {"Lowest Capacity Asset", "GOOCV W78ZERHAOVVQ|GOOCV VP83T1ZUHROL"},
-            {"Portfolio Turnover", "2867.58%"},
-            {"OrderListHash", "5c32a1e90845e321ae1cc8b893353acd"}
+            {"Lowest Capacity Asset", "GOOCV W78ZERHAT67A|GOOCV VP83T1ZUHROL"},
+            {"Portfolio Turnover", "2888.68%"},
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "8a2ee1e491737ecabd775ad5afbe2e4b"}
         };
     }
 }

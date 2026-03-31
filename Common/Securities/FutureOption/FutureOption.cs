@@ -52,7 +52,7 @@ namespace QuantConnect.Securities.FutureOption
                 new OptionPortfolioModel(),
                 new FutureOptionFillModel(),
                 new InteractiveBrokersFeeModel(),
-                new ConstantSlippageModel(0),
+                NullSlippageModel.Instance,
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 null,
@@ -60,10 +60,16 @@ namespace QuantConnect.Securities.FutureOption
                 new SecurityPriceVariationModel(),
                 currencyConverter,
                 registeredTypes,
-                underlying
+                underlying,
+                null
         )
         {
             BuyingPowerModel = new FuturesOptionsMarginModel(0, this);
         }
+
+        /// <summary>
+        /// Returns the securities symbol
+        /// </summary>
+        public static implicit operator Symbol(FutureOption security) => security.Symbol;
     }
 }

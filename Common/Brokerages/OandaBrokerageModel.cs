@@ -45,7 +45,8 @@ namespace QuantConnect.Brokerages
         {
             OrderType.Limit,
             OrderType.Market,
-            OrderType.StopMarket
+            OrderType.StopMarket,
+            OrderType.StopLimit
         };
 
         /// <summary>
@@ -131,16 +132,6 @@ namespace QuantConnect.Brokerages
         public override IFeeModel GetFeeModel(Security security)
         {
             return new ConstantFeeModel(0m);
-        }
-
-        /// <summary>
-        /// Gets a new slippage model that represents this brokerage's fill slippage behavior
-        /// </summary>
-        /// <param name="security">The security to get a slippage model for</param>
-        /// <returns>The new slippage model for this brokerage</returns>
-        public override ISlippageModel GetSlippageModel(Security security)
-        {
-            return new ConstantSlippageModel(0);
         }
 
         /// <summary>

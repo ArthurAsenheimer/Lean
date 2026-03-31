@@ -60,37 +60,41 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public override Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public override List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "32"},
+            {"Total Orders", "32"},
             {"Average Win", "6.14%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "26116903817855100000000000000%"},
             {"Drawdown", "0.500%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "257114"},
             {"Net Profit", "157.114%"},
-            {"Sharpe Ratio", "107.76"},
+            {"Sharpe Ratio", "107.743"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "95.713%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "60.292"},
+            {"Alpha", "60.088"},
             {"Beta", "-19.374"},
             {"Annual Standard Deviation", "0.593"},
             {"Annual Variance", "0.351"},
             {"Information Ratio", "106.234"},
             {"Tracking Error", "0.603"},
-            {"Treynor Ratio", "-3.296"},
+            {"Treynor Ratio", "-3.295"},
             {"Total Fees", "$16.00"},
             {"Estimated Strategy Capacity", "$87000.00"},
-            {"Lowest Capacity Asset", "GOOCV 305RBQ20WHPNQ|GOOCV VP83T1ZUHROL"},
+            {"Lowest Capacity Asset", "GOOCV 305RBQ20WLZZA|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "10.93%"},
-            {"OrderListHash", "618a73d24e5439125985145f165f31b7"}
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "19b8f2a8081c3cfa8f6bc02b5d045765"}
         };
     }
 }

@@ -71,7 +71,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public virtual Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public virtual List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -84,18 +84,26 @@ namespace QuantConnect.Algorithm.CSharp
         public virtual int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "11"},
+            {"Total Orders", "11"},
             {"Average Win", "0.00%"},
             {"Average Loss", "-0.01%"},
             {"Compounding Annual Return", "353.938%"},
             {"Drawdown", "2.300%"},
             {"Expectancy", "-0.749"},
+            {"Start Equity", "100000"},
+            {"End Equity", "101952.99"},
             {"Net Profit", "1.953%"},
-            {"Sharpe Ratio", "11.787"},
+            {"Sharpe Ratio", "11.757"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "65.582%"},
             {"Loss Rate", "75%"},
             {"Win Rate", "25%"},
@@ -106,12 +114,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Annual Variance", "0.062"},
             {"Information Ratio", "8.324"},
             {"Tracking Error", "0.114"},
-            {"Treynor Ratio", "2.95"},
+            {"Treynor Ratio", "2.942"},
             {"Total Fees", "$15.02"},
             {"Estimated Strategy Capacity", "$2600000.00"},
             {"Lowest Capacity Asset", "IBM R735QTJ8XC9X"},
             {"Portfolio Turnover", "44.15%"},
-            {"OrderListHash", "3865de00b5145f8939b1cde9dc0c2d8f"}
+            {"Drawdown Recovery", "2"},
+            {"OrderListHash", "14d509658aa542a210a3d6d41c05cd22"}
         };
     }
 }

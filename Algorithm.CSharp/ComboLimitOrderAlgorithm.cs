@@ -28,6 +28,9 @@ namespace QuantConnect.Algorithm.CSharp
         private decimal _limitPrice;
         private int _comboQuantity;
 
+        private decimal _temporaryLimitPrice;
+        private int _temporaryComboQuantity;
+
         private int _fillCount;
 
         private decimal _liquidatedQuantity;
@@ -43,14 +46,29 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
+        protected virtual bool AsynchronousOrders => false;
+
         protected override IEnumerable<OrderTicket> PlaceComboOrder(List<Leg> legs, int quantity, decimal? limitPrice)
         {
             _limitPrice = limitPrice.Value;
             _comboQuantity = quantity;
+            _temporaryLimitPrice = limitPrice.Value - Math.Sign(quantity) * limitPrice.Value * 0.5m; // Won't fill
+            _temporaryComboQuantity = quantity * 10;
 
             legs.ForEach(x => { x.OrderPrice = null; });
 
-            return ComboLimitOrder(legs, quantity, _limitPrice);
+            // First, let's place a limit order that won't fill so we can update it later
+            return ComboLimitOrder(legs, _temporaryComboQuantity, _temporaryLimitPrice, asynchronous: AsynchronousOrders);
+        }
+
+        protected override void UpdateComboOrder(List<OrderTicket> tickets)
+        {
+            // Let's update the quantity and limit price to the real values
+            tickets[0].Update(new UpdateOrderFields
+            {
+                Quantity = _comboQuantity,
+                LimitPrice = _limitPrice
+            });
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
@@ -75,12 +93,12 @@ namespace QuantConnect.Algorithm.CSharp
 
                     if (_liquidatedQuantity != totalComboQuantity)
                     {
-                        throw new Exception($"Liquidated quantity {_liquidatedQuantity} does not match combo quantity {totalComboQuantity}");
+                        throw new RegressionTestException($"Liquidated quantity {_liquidatedQuantity} does not match combo quantity {totalComboQuantity}");
                     }
 
                     if (Portfolio.TotalHoldingsValue != 0)
                     {
-                        throw new Exception($"Portfolio value {Portfolio.TotalPortfolioValue} is not zero");
+                        throw new RegressionTestException($"Portfolio value {Portfolio.TotalPortfolioValue} is not zero");
                     }
                 }
             }
@@ -92,18 +110,26 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (_limitPrice == null)
             {
-                throw new Exception("Limit price was not set");
+                throw new RegressionTestException("Limit price was not set");
             }
 
             var fillPricesSum = FillOrderEvents.Take(OrderLegs.Count).Select(x => x.FillPrice * x.FillQuantity / _comboQuantity).Sum();
             if (_limitPrice < fillPricesSum)
             {
-                throw new Exception($"Limit price expected to be greater that the sum of the fill prices ({fillPricesSum}), but was {_limitPrice}");
+                throw new RegressionTestException($"Limit price expected to be greater that the sum of the fill prices ({fillPricesSum}), but was {_limitPrice}");
             }
 
             if (!_liquidated)
             {
-                throw new Exception("Combo order was not liquidated");
+                throw new RegressionTestException("Combo order was not liquidated");
+            }
+
+            foreach (var ticket in Transactions.GetOrderTickets().Where(x => x.OrderType == OrderType.ComboLimit))
+            {
+                if (ticket.SubmitRequest.Asynchronous != AsynchronousOrders)
+                {
+                    throw new RegressionTestException("Expected all orders to have the same asynchronous flag as the algorithm.");
+                }
             }
         }
 
@@ -115,12 +141,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public override Language[] Languages { get; } = { Language.CSharp };
+        public override List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 475788;
+        public override long DataPoints => 15023;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -128,18 +154,26 @@ namespace QuantConnect.Algorithm.CSharp
         public override int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public override AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "6"},
+            {"Total Orders", "6"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "200000"},
+            {"End Equity", "196348"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -151,11 +185,12 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$85.00"},
+            {"Total Fees", "$52.00"},
             {"Estimated Strategy Capacity", "$5000.00"},
-            {"Lowest Capacity Asset", "GOOCV W78ZERHAOVVQ|GOOCV VP83T1ZUHROL"},
-            {"Portfolio Turnover", "60.92%"},
-            {"OrderListHash", "186986b27fac082600a064a8a59df604"}
+            {"Lowest Capacity Asset", "GOOCV W78ZERHAT67A|GOOCV VP83T1ZUHROL"},
+            {"Portfolio Turnover", "60.91%"},
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "7daf3d43bef2b023ab26517085840c0e"}
         };
     }
 }

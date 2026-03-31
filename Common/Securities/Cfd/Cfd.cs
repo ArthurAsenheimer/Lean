@@ -51,7 +51,7 @@ namespace QuantConnect.Securities.Cfd
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new ConstantFeeModel(0),
-                new ConstantSlippageModel(0),
+                NullSlippageModel.Instance,
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 new SecurityMarginModel(50m),
@@ -91,7 +91,7 @@ namespace QuantConnect.Securities.Cfd
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new ConstantFeeModel(0),
-                new ConstantSlippageModel(0),
+                NullSlippageModel.Instance,
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 new SecurityMarginModel(50m),
@@ -140,5 +140,10 @@ namespace QuantConnect.Securities.Cfd
                 throw new InvalidOperationException($"Symbol doesn't end with {quoteCurrency}");
             }
         }
+
+        /// <summary>
+        /// Returns the securities symbol
+        /// </summary>
+        public static implicit operator Symbol(Cfd security) => security.Symbol;
     }
 }

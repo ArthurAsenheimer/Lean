@@ -38,37 +38,41 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public override Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public override List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "4"},
+            {"Total Orders", "4"},
             {"Average Win", "9.48%"},
             {"Average Loss", "-16.73%"},
             {"Compounding Annual Return", "-25.790%"},
             {"Drawdown", "0.600%"},
             {"Expectancy", "-0.478"},
+            {"Start Equity", "100000"},
+            {"End Equity", "99538"},
             {"Net Profit", "-0.462%"},
-            {"Sharpe Ratio", "7.117"},
+            {"Sharpe Ratio", "-6.902"},
+            {"Sortino Ratio", "0"},
             {"Probabilistic Sharpe Ratio", "95.713%"},
             {"Loss Rate", "67%"},
             {"Win Rate", "33%"},
             {"Profit-Loss Ratio", "0.57"},
-            {"Alpha", "0.001"},
+            {"Alpha", "-0.009"},
             {"Beta", "-0.023"},
             {"Annual Standard Deviation", "0.001"},
             {"Annual Variance", "0"},
             {"Information Ratio", "10.521"},
             {"Tracking Error", "0.018"},
-            {"Treynor Ratio", "-0.218"},
+            {"Treynor Ratio", "0.211"},
             {"Total Fees", "$2.00"},
             {"Estimated Strategy Capacity", "$0"},
             {"Lowest Capacity Asset", "GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "26.71%"},
-            {"OrderListHash", "a5a314044fbaee3ce6bcaefa2ab5c391"}
+            {"Drawdown Recovery", "0"},
+            {"OrderListHash", "5d0637a25841a3eb1344e8564792acb7"}
         };
     }
 }

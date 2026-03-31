@@ -19,6 +19,9 @@ using System.Text.RegularExpressions;
 
 namespace QuantConnect.Report.ReportElements
 {
+    /// <summary>
+    /// Class for creating a two column table for the Algorithm's Parameters in a report
+    /// </summary>
     public class ParametersReportElement : ReportElement
     {
         private IReadOnlyDictionary<string, string> _parameters;
@@ -75,7 +78,7 @@ namespace QuantConnect.Report.ReportElements
                     if (parameterIndex < _parameters.Count)
                     {
                         var parameter = _parameters.ElementAt(parameterIndex);
-                        template = template.Replace(currTemplateKey, EmbellishKeyName(parameter.Key));
+                        template = template.Replace(currTemplateKey, parameter.Key);
                         template = template.Replace(currTemplateValue, parameter.Value);
                     }
                     else
@@ -107,17 +110,6 @@ namespace QuantConnect.Report.ReportElements
 
             var parameters= string.Join("\n", items);
             return parameters;
-        }
-
-        /// <summary>
-        /// Replaces the "-" character in the given string for a space, and upper case
-        /// each word in the given string
-        /// </summary>
-        /// <param name="keyName">Key name to embellish</param>
-        /// <returns>The given key name embellished as the description says</returns>
-        private static string EmbellishKeyName(string keyName)
-        {
-            return string.Join(" ", (keyName).Split("-").Select(x => x[0].ToString().ToUpper() + x.Substring(1)));
         }
     }
 }
