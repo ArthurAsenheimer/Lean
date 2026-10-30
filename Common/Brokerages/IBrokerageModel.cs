@@ -195,8 +195,11 @@ namespace QuantConnect.Brokerages
             switch (brokerage)
             {
                 case BrokerageName.Default:
-                case BrokerageName.TerminalLink:
                     return new DefaultBrokerageModel(accountType);
+
+                case BrokerageName.TerminalLink:
+                case BrokerageName.QuantBridge:
+                    return new QuantBridgeBrokerageModel(accountType);
 
                 case BrokerageName.Alpaca:
                     return new AlpacaBrokerageModel();
@@ -293,6 +296,15 @@ namespace QuantConnect.Brokerages
 
                 case BrokerageName.Webull:
                     return new WebullBrokerageModel(accountType);
+
+                case BrokerageName.Public:
+                    return new PublicBrokerageModel(accountType);
+
+                case BrokerageName.BloombergFix:
+                    return new BloombergFixBrokerageModel(accountType);
+
+                case BrokerageName.ClearStreet:
+                    return new ClearStreetBrokerageModel(accountType);
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(brokerage), brokerage, null);
@@ -391,6 +403,9 @@ namespace QuantConnect.Brokerages
                 case TradeStationBrokerageModel _:
                     return BrokerageName.TradeStation;
 
+                case QuantBridgeBrokerageModel:
+                    return BrokerageName.QuantBridge;
+
                 case CharlesSchwabBrokerageModel:
                     return BrokerageName.CharlesSchwab;
 
@@ -399,6 +414,15 @@ namespace QuantConnect.Brokerages
 
                 case WebullBrokerageModel:
                     return BrokerageName.Webull;
+
+                case PublicBrokerageModel:
+                    return BrokerageName.Public;
+
+                case BloombergFixBrokerageModel _:
+                    return BrokerageName.BloombergFix;
+
+                case ClearStreetBrokerageModel:
+                    return BrokerageName.ClearStreet;
 
                 case DefaultBrokerageModel _:
                     return BrokerageName.Default;

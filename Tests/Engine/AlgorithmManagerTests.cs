@@ -191,6 +191,10 @@ namespace QuantConnect.Tests.Engine
             {
             }
 
+            public void OnWarmupFinished()
+            {
+            }
+
             public void DebugMessage(string message)
             {
             }
@@ -230,6 +234,12 @@ namespace QuantConnect.Tests.Engine
             public void SendStatusUpdate(AlgorithmStatus status, string message = "")
             {
             }
+
+            public void AddDeploymentDetail(string key, string value)
+            {
+            }
+
+            public ReadOnlyExtendedDictionary<string, string> DeploymentDetails { get; } = new();
 
             public void RuntimeStatistic(string key, string value)
             {
